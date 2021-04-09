@@ -1,4 +1,4 @@
-define(["util/camera"], function (camera) {
+define(["util/constants"], function (constants) {
     // If pack is set to true, sprites will be loaded from a singular sprite
     // sheet. Otherwise the images are loaded separately.
     const pack = true;
@@ -166,7 +166,7 @@ define(["util/camera"], function (camera) {
     })();
     const spriteSheet = (function () {
         const i = new Image();
-        i.src = "img/sprite.png";
+        i.src = "img/sprite-2x.png";
         return {img: i, conf: sheetConfig, legacy: {}};
     })();
 
@@ -185,7 +185,7 @@ define(["util/camera"], function (camera) {
             console.error("Sprite sheet does not contain " + src);
             return;
         }
-        ctx.drawImage(this.img, conf.x, conf.y, conf.w, conf.h,
+        ctx.drawImage(this.img, conf.x * 2, conf.y * 2, conf.w * 2, conf.h * 2,
             Math.round(sprite.x), Math.round(sprite.y), sprite.w, sprite.h);
     };
     spriteSheet.loadLegacy = function () {
@@ -270,10 +270,10 @@ define(["util/camera"], function (camera) {
             const conf = spriteSheet.get(src);
             if (conf) {
                 if (!w) {
-                    this.w = Math.round(conf.w * camera.getRatio());
+                    this.w = constants.relativePixel(conf.w);
                 }
                 if (!h) {
-                    this.h = Math.round(conf.h * camera.getRatio());
+                    this.h = constants.relativePixel(conf.h);
                 }
             } else {
                 console.warn(src + " not found in sprite sheet");

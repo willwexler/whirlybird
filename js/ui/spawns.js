@@ -1,4 +1,4 @@
-define(["ui/pool", "util/constants", "util/camera"], function (pool, constants, camera) {
+define(["ui/pool", "util/constants"], function (pool, constants) {
     const gap = constants.platformGap; // gap between two platforms
     const stairs = [];
 
@@ -12,8 +12,8 @@ define(["ui/pool", "util/constants", "util/camera"], function (pool, constants, 
 
     // Create enough initial platforms at game's start.
     function init() {
-        const size = Math.ceil(camera.getHeight() / gap);
-        const start = -Math.round(camera.getHeight() * 0.46);
+        const size = Math.ceil(constants.height / gap);
+        const start = -Math.round(constants.height * 0.46);
 
         while (stairs.length) {
             stairs.pop();

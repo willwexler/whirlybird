@@ -1,4 +1,4 @@
-define(["ui/sprite", "util/camera"], function (Sprite, camera) {
+define(["ui/sprite", "util/camera", "util/constants"], function (Sprite, camera, constants) {
     const sprite = {
         src: "ribbon",
     };
@@ -24,7 +24,7 @@ define(["ui/sprite", "util/camera"], function (Sprite, camera) {
         draw(ctx) {
             if (this.altitude && camera.canFitIn(this)) {
                 super.draw(ctx);
-                ctx.font = `${14 * camera.getRatio()}px Arial`;
+                ctx.font = `${constants.fontSize(14)}px Arial`;
                 ctx.textBaseline = "bottom";
                 ctx.textAligh = "left";
                 ctx.fillStyle = "#555";

@@ -1,4 +1,4 @@
-define(["ui/sprite", "util/camera"], function (Sprite, camera) {
+define(["ui/sprite", "util/constants"], function (Sprite, constants) {
     const spritesConfig = {
         restart: {
             src: "btn-restart",
@@ -39,7 +39,6 @@ define(["ui/sprite", "util/camera"], function (Sprite, camera) {
         },
     };
 
-    const titleFontSize = Math.round(38 * camera.getRatio());
     const sprites = {};
     for (const [key, value] of Object.entries(spritesConfig)) {
         sprites[key] = new Sprite(value.src);
@@ -60,25 +59,25 @@ define(["ui/sprite", "util/camera"], function (Sprite, camera) {
         // |       restart        |
         // |                      |
         //  ----------------------
-        const gapHorizontal = camera.getWidth() / 5;  // gap between eg-ok and eg-caution
-        const gapVertical1 = 160 * camera.getRatio(); // gap between title and ic-ok
-        const gapVertical2 = 60 * camera.getRatio();  // gap between ic-ok and eg-ok
-        const gapVertical3 = 140 * camera.getRatio(); // gap between eg-ok and restart
+        const gapHorizontal = Math.floor(constants.width / 5); // gap between eg-ok and eg-caution
+        const gapVertical1 = constants.relativePixel(160); // gap between title and ic-ok
+        const gapVertical2 = constants.relativePixel(60); // gap between ic-ok and eg-ok
+        const gapVertical3 = constants.relativePixel(140); // gap between eg-ok and restart
         const groupHeight = sprites.restart.h + sprites.icOk.h + sprites.egOk.h +
             gapVertical1 + gapVertical2 + gapVertical3;
         const groupWidth = sprites.egOk.w + sprites.egCaution.w + gapHorizontal;
-        const top = (camera.getHeight() - groupHeight) / 2;
+        const top = Math.floor((constants.height - groupHeight) / 2);
         const animClipDuration = 6;
 
         // setup restart button
         it = sprites.restart;
-        it.x = (camera.getWidth() - it.w) / 2;
+        it.x = (constants.width - it.w) / 2;
         it.y = top + groupHeight - it.h;
 
         // setup egOk
         it = sprites.egOk;
         that = sprites.restart;
-        it.x = (camera.getWidth() - groupWidth) / 2;
+        it.x = (constants.width - groupWidth) / 2;
         it.y = that.y - gapVertical3 - it.h;
         it.setAnimation(spritesConfig.egOk.animSrc, animClipDuration);
 
@@ -110,10 +109,10 @@ define(["ui/sprite", "util/camera"], function (Sprite, camera) {
         sprites.egCaution.anim.drawClip(ctx);
 
         ctx.fillStyle = "#4e4e4e";
-        ctx.font = `bold ${titleFontSize}px Serif`;
+        ctx.font = `bold ${constants.fontSize(38)}px Serif`;
         ctx.textBaseline = "top";
         ctx.textAlign = "center";
-        ctx.fillText(text, camera.getWidth() / 2, camera.getHeight() * 0.3);
+        ctx.fillText(text, constants.width / 2, constants.height * 0.3);
     }
 
     placeEverything();
@@ -131,8 +130,6 @@ define(["ui/sprite", "util/camera"], function (Sprite, camera) {
         draw(ctx) {
             draw(ctx, "START GAME");
         },
-
-        onResize: placeEverything,
 
         isClickingRestart(point) {
             return sprites.restart.isClickingMe(point.x, point.y);

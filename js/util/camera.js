@@ -1,9 +1,6 @@
 define(["util/constants"], function (constants) {
-    const padding = 5;
-
-    let width = constants.defaultWidth;
-    let height = constants.defaultHeight;
-    let ratio = 1;
+    const width = constants.width;
+    const height = constants.height;
 
     const focal = {
         x: width / 2,
@@ -13,48 +10,6 @@ define(["util/constants"], function (constants) {
         high: Math.floor(height * 0.5),
         low: Math.floor(height * 0.92)
     };
-
-    // Update camera size based on the window size.
-    function resize() {
-        if (window.innerHeight < 1100) {
-            console.warn("Recommend window.innerHeight to be at least 1100.",
-                `window.innerHeight = ${window.innerHeight}`);
-        } else {
-            console.log(`window.innerHeight = ${window.innerHeight}`);
-        }
-        height = Math.min(constants.defaultHeight, window.innerHeight - 2 * padding);
-
-        boxY.high = Math.floor(height * 0.5);
-        boxY.low = Math.floor(height * 0.92);
-
-        // adjustForSmallWindows();
-    }
-
-    // Adjust constants to fit in a smaller window. This is only a temporary
-    // workaround. It's not a fix.
-    // This function only runs once. You'll have to refresh the page if you were
-    // to resize the window.
-    function adjustForSmallWindows() {
-        if (this.windowDebug) {
-            return;
-        }
-        this.windowDebug = true;
-        if (height >= 1100) {
-            return;
-        }
-        ratio = height / constants.defaultHeight;
-        width = Math.round(constants.defaultWidth * ratio);
-        constants.gravity *= ratio;
-        constants.moveVelocity *= ratio;
-        constants.jumpVelocity *= ratio;
-        constants.bounceVelocity *= ratio;
-        constants.powerUpVelocity *= ratio;
-        constants.maxFallingVelocity *= ratio;
-        constants.platformPadding = Math.round(constants.platformPadding * ratio);
-        constants.platformGap = Math.round(constants.platformGap * ratio);
-        constants.platformMoveSpeed *= ratio;
-        constants.fallingThreshold = Math.round(constants.fallingThreshold * ratio);
-    }
 
     // Try to follow a target. If it goes outside of a box range, move the
     // camera so we don't lose it.
@@ -81,23 +36,7 @@ define(["util/constants"], function (constants) {
         };
     }
 
-    resize();
-
     return {
-        onResize: resize,
-
-        // width/height might change dynamically if user tries to resize the
-        // window.
-        getWidth: function () {
-            return width;
-        },
-        getHeight: function () {
-            return height;
-        },
-        getRatio: function () {
-            return ratio;
-        },
-
         // The point parameters in follow(), focus(), and moveTo() are all
         // absolute positions.
         follow: function (point) {

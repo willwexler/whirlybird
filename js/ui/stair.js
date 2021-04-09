@@ -116,7 +116,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
         }
 
         return function (width) {
-            return random(spawnPadding, camera.getWidth() - width - spawnPadding);
+            return random(spawnPadding, constants.width - width - spawnPadding);
         };
     })();
 
@@ -174,7 +174,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         // If the platform has left from the canvas bottom.
         hasGone() {
-            return this.y > camera.getHeight();
+            return this.y > constants.height;
         }
 
         // Disables the platform, makes it recyclable by an ObjectPooler.
@@ -216,7 +216,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
             }
             if (this.moveSpeed) {
                 this.x += this.moveSpeed;
-                if (this.x <= 0 || this.x + this.w > camera.getWidth()) {
+                if (this.x <= 0 || this.x + this.w > constants.width) {
                     this.moveSpeed = -this.moveSpeed;
                 }
             }

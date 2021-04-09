@@ -45,8 +45,8 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
         // Reset android to original point, clear velocity, animations,
         // and ask for camera's instant attention.
         reset() {
-            this.x = (camera.getWidth() - this.w) / 2;
-            this.y = (camera.getHeight() - this.h) / 2;
+            this.x = (constants.width - this.w) / 2;
+            this.y = (constants.height - this.h) / 2;
 
             this.velocity = {x: 0, y: 0};
             this.altitude = 0;
@@ -111,9 +111,9 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
         // range, and vice versa.
         clampX(x) {
             if (x < -this.w / 2) {
-                return camera.getWidth() - this.w / 2;
+                return constants.width - this.w / 2;
             }
-            if (x > camera.getWidth() - this.w / 2) {
+            if (x > constants.width - this.w / 2) {
                 return -this.w / 2;
             }
             return x;

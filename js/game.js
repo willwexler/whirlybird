@@ -3,7 +3,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
     android, platforms, ribbon, panel, constants, input, camera
 ) {
 
-    // Maintains/Persists best game score.
+    // Maintain/Persist best game score.
     const bestScore = (function () {
         const key = "best";
         return {
@@ -31,8 +31,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
         }
 
         init() {
-            this.canvas = this.createCanvas();
-            this.context = this.canvas.getContext("2d");
+            this.createCanvas();
 
             this.frames = 0;
             this.gameOverAt = 0;
@@ -45,20 +44,27 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
 
         // self-explanatory
         createCanvas() {
-            const canvas = document.createElement("canvas");
-            canvas.width = camera.getWidth();
-            canvas.height = camera.getHeight();
-            this.container.appendChild(canvas);
+            this.canvas = document.createElement("canvas");
+            this.canvas.style.width = constants.width + "px";
+            this.canvas.style.height = constants.height + "px";
+            this.canvas.width = constants.width * devicePixelRatio;
+            this.canvas.height = constants.height * devicePixelRatio;
+
+            this.context = this.canvas.getContext("2d");
+            this.context.scale(devicePixelRatio, devicePixelRatio);
+
+            this.container.appendChild(this.canvas);
             this.centerContainer();
-            return canvas;
+
+            console.log(devicePixelRatio);
         }
 
         // self-explanatory
         centerContainer() {
-            this.container.style.width = camera.getWidth() + "px";
-            this.container.style.height = camera.getHeight() + "px";
-            this.x = (window.innerWidth - camera.getWidth()) / 2;
-            this.y = (window.innerHeight - camera.getHeight()) / 2;
+            this.container.style.width = constants.width + "px";
+            this.container.style.height = constants.height + "px";
+            this.x = (window.innerWidth - constants.width) / 2;
+            this.y = (window.innerHeight - constants.height) / 2;
             this.container.style.marginLeft = this.x + "px";
             this.container.style.marginTop = this.y + "px";
         }
@@ -66,11 +72,12 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
         // Listens to resize event.
         // Centers the canvas container and notify relative parties of this change.
         onResizeWindow() {
-            camera.onResize();
-            this.canvas.width = camera.getWidth();
-            this.canvas.height = camera.getHeight();
+            // constants.onResize();
+            // this.canvas.width = constants.width;
+            // this.canvas.height = constants.height;
+            // camera.onResize();
+            // panel.onResize();
             this.centerContainer();
-            panel.onResize();
         }
 
         // Listens to mousedown event.
@@ -188,15 +195,14 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
 
         drawScore(ctx) {
             ctx.fillStyle = "#555";
-            // ctx.font = "20px Arial";
-            ctx.font = `${20 * camera.getRatio()}px Arial`;
+            ctx.font = `${constants.fontSize(20)}px Arial`;
             ctx.textBaseline = "bottom";
             ctx.textAlign = "left";
-            const padding = 60 * camera.getRatio();
+            const padding = constants.relativePixel(60);
             ctx.clearRect(0, 0, this.canvas.width, padding + 5);
             ctx.fillText(
                 `Score: ${android.getScore()}    Best: ${this.bestScore}`,
-                40 * camera.getRatio(), padding
+                constants.relativePixel(40), padding
             );
         }
     }
