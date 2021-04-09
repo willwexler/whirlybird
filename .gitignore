@@ -1,4 +1,4 @@
 /.idea
-/js/lib
 /img/slice
+/js/lib/require.js
 .DS_Store
