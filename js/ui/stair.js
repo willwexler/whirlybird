@@ -1,4 +1,4 @@
-define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constants, camera) {
+define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, camera) {
     const sprites = [
         {
             src: "stair-default",
@@ -106,17 +106,15 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
         }
     };
 
-    const moveSpeed = constants.platformMoveSpeed;
-
     // Randomize the X position of the platforms.
     const randomX = (function () {
-        const spawnPadding = constants.platformPadding;
+        const spawnPadding = config.platformPadding;
         const random = function (min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
         return function (width) {
-            return random(spawnPadding, constants.width - width - spawnPadding);
+            return random(spawnPadding, config.width - width - spawnPadding);
         };
     })();
 
@@ -127,7 +125,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
             this.enabled = false;
         }
 
-        update(frames) {
+        update() {
             if (!this.enabled) {
                 return;
             }
@@ -174,7 +172,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         // If the platform has left from the canvas bottom.
         hasGone() {
-            return this.y > constants.height;
+            return this.y > config.height;
         }
 
         // Disables the platform, makes it recyclable by an ObjectPooler.
@@ -196,13 +194,13 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
                 android.y + android.h >= this.y &&
                 android.y + android.h < this.y + this.h;
             if (!flag) {
-                return constants.COLLIDE_TYPE_NONE;
+                return config.COLLIDE_TYPE_NONE;
             }
             if (this.powerup && this.powerup.enabled) {
                 this.powerup.enabled = false;
-                return constants.COLLIDE_TYPE_POWER;
+                return config.COLLIDE_TYPE_POWER;
             }
-            return constants.COLLIDE_TYPE_JUMP;
+            return config.COLLIDE_TYPE_JUMP;
         }
 
         getRealPosition() {
@@ -216,7 +214,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
             }
             if (this.moveSpeed) {
                 this.x += this.moveSpeed;
-                if (this.x <= 0 || this.x + this.w > constants.width) {
+                if (this.x <= 0 || this.x + this.w > config.width) {
                     this.moveSpeed = -this.moveSpeed;
                 }
             }
@@ -323,7 +321,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         isBeingStepped(android) {
             if (this.collapse) {
-                return constants.COLLIDE_TYPE_NONE;
+                return config.COLLIDE_TYPE_NONE;
             }
             const flag = super.isBeingStepped(android);
             if (flag) {
@@ -353,7 +351,12 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
         constructor(altitude) {
             super(sprites[3], altitude, true);
             super.setAnimation(sprites[3].animSrc, 8);
-            super.startPatrol(moveSpeed);
+            super.startPatrol(config.platformMoveSpeed);
+        }
+
+        reset(altitude) {
+            super.reset(altitude);
+            super.startPatrol(config.platformMoveSpeed);
         }
 
         update(frames) {
@@ -385,13 +388,13 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         isBeingStepped(android) {
             if (this.collapse) {
-                return constants.COLLIDE_TYPE_NONE;
+                return config.COLLIDE_TYPE_NONE;
             }
             const flag = super.isBeingStepped(android);
             if (flag) {
                 this.collapse = true;
             }
-            return constants.COLLIDE_TYPE_NONE;
+            return config.COLLIDE_TYPE_NONE;
         }
 
         update(frames) {
@@ -420,9 +423,9 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
         isBeingStepped(android) {
             const flag = super.isBeingStepped(android);
             if (flag) {
-                return constants.COLLIDE_TYPE_HURT;
+                return config.COLLIDE_TYPE_HURT;
             }
-            return constants.COLLIDE_TYPE_NONE;
+            return config.COLLIDE_TYPE_NONE;
         }
     }
 
@@ -431,7 +434,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
         constructor(altitude) {
             super(sprites[6], altitude);
             this.bounce = false;
-            super.setAnimation(sprites[6].animSrc, 3);
+            super.setAnimation(sprites[6].animSrc, 2);
         }
 
         reset(altitude) {
@@ -442,14 +445,14 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         isBeingStepped(android) {
             if (this.bounce) {
-                return constants.COLLIDE_TYPE_NONE;
+                return config.COLLIDE_TYPE_NONE;
             }
             const flag = super.isBeingStepped(android);
             if (flag) {
                 this.bounce = true;
-                return constants.COLLIDE_TYPE_BOUNCE;
+                return config.COLLIDE_TYPE_BOUNCE;
             }
-            return constants.COLLIDE_TYPE_NONE;
+            return config.COLLIDE_TYPE_NONE;
         }
 
         update(frames) {
@@ -476,7 +479,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
         constructor(altitude) {
             super(sprites[7], altitude);
             super.setAnimation(sprites[7].animSrc, 6);
-            super.startPatrol(moveSpeed);
+            super.startPatrol(config.platformMoveSpeed);
             this.kicked = false;
             this.kickForce = 0.5;
             this.velocityY = 0;
@@ -484,6 +487,7 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         reset(altitude) {
             super.reset(altitude);
+            super.startPatrol(config.platformMoveSpeed);
             this.kicked = false;
             this.velocityY = 0;
             this.anim.reset();
@@ -491,18 +495,18 @@ define(["ui/sprite", "util/constants", "util/camera"], function (Sprite, constan
 
         isBeingStepped(android) {
             if (this.kicked) {
-                return constants.COLLIDE_TYPE_NONE;
+                return config.COLLIDE_TYPE_NONE;
             }
             const flag = super.isBeingStepped(android);
             if (flag) {
                 this.kicked = true;
                 if (this.isSlimeAggressive()) {
-                    return constants.COLLIDE_TYPE_HURT;
+                    return config.COLLIDE_TYPE_HURT;
                 } else {
-                    return constants.COLLIDE_TYPE_JUMP;
+                    return config.COLLIDE_TYPE_JUMP;
                 }
             }
-            return constants.COLLIDE_TYPE_NONE;
+            return config.COLLIDE_TYPE_NONE;
         }
 
         isSlimeAggressive() {

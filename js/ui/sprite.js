@@ -1,4 +1,4 @@
-define(["util/constants"], function (constants) {
+define(["util/config"], function (config) {
     // If pack is set to true, sprites will be loaded from a singular sprite
     // sheet. Otherwise the images are loaded separately.
     const pack = true;
@@ -166,13 +166,16 @@ define(["util/constants"], function (constants) {
     })();
     const spriteSheet = (function () {
         const i = new Image();
-        i.src = "img/sprite-2x.png";
+        i.src = "img/sprite.png";
         return {img: i, conf: sheetConfig, legacy: {}};
     })();
 
+    // Get the position and dimension config of a sprite.
     spriteSheet.get = function (src) {
         return this.conf[src];
     };
+
+    // Draw the sprite to the canvas.
     spriteSheet.draw = function (ctx, sprite, src) {
         if (!pack) {
             return this.drawLegacy(ctx, sprite, src);
@@ -185,9 +188,11 @@ define(["util/constants"], function (constants) {
             console.error("Sprite sheet does not contain " + src);
             return;
         }
-        ctx.drawImage(this.img, conf.x * 2, conf.y * 2, conf.w * 2, conf.h * 2,
-            Math.round(sprite.x), Math.round(sprite.y), sprite.w, sprite.h);
+        ctx.drawImage(this.img, conf.x, conf.y, conf.w, conf.h,
+            sprite.x, sprite.y, sprite.w, sprite.h);
     };
+
+    // Load sprite images separately (only when pack=false).
     spriteSheet.loadLegacy = function () {
         Object.keys(this.conf).forEach(src => {
             const img = new Image();
@@ -210,6 +215,15 @@ define(["util/constants"], function (constants) {
     if (!pack) {
         spriteSheet.loadLegacy();
     }
+
+    // Save all instantiated sprites to a bottle. Once the window is resized,
+    // it would be much easier to scale all of the sprites here.
+    const bottle = [];
+    config.registerResizeEvent(function () {
+        for (const sprite of bottle) {
+            sprite.onResize();
+        }
+    });
 
     class Animation {
         constructor(parent, images, clipDuration) {
@@ -260,23 +274,20 @@ define(["util/constants"], function (constants) {
     }
 
     return class Sprite {
-        constructor(src = "", w = 0, h = 0, x = 0, y = 0) {
+        constructor(src) {
             this.src = src;
-            this.w = w;
-            this.h = h;
-            this.x = x;
-            this.y = y;
+            this.w = this.h = this.x = this.y = 0;
+            this.onResize();
+            bottle.push(this);
+        }
 
-            const conf = spriteSheet.get(src);
+        onResize() {
+            const conf = spriteSheet.get(this.src);
             if (conf) {
-                if (!w) {
-                    this.w = constants.relativePixel(conf.w);
-                }
-                if (!h) {
-                    this.h = constants.relativePixel(conf.h);
-                }
+                this.w = config.relativePixel(conf.w);
+                this.h = config.relativePixel(conf.h);
             } else {
-                console.warn(src + " not found in sprite sheet");
+                console.warn(this.src + " not found in sprite sheet");
             }
         }
 

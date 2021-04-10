@@ -1,6 +1,6 @@
 define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
-    "util/constants", "util/input", "util/camera"], function (
-    android, platforms, ribbon, panel, constants, input, camera
+    "util/config", "util/input"], function (
+    android, platforms, ribbon, panel, config, input
 ) {
 
     // Maintain/Persist best game score.
@@ -31,7 +31,10 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
         }
 
         init() {
-            this.createCanvas();
+            this.canvas = this.createCanvas(this.container);
+            this.context = this.canvas.getContext("2d");
+            this.centerContainer();
+            this.enableHighResolutionDisplay();
 
             this.frames = 0;
             this.gameOverAt = 0;
@@ -43,41 +46,39 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
         }
 
         // self-explanatory
-        createCanvas() {
-            this.canvas = document.createElement("canvas");
-            this.canvas.style.width = constants.width + "px";
-            this.canvas.style.height = constants.height + "px";
-            this.canvas.width = constants.width * devicePixelRatio;
-            this.canvas.height = constants.height * devicePixelRatio;
-
-            this.context = this.canvas.getContext("2d");
-            this.context.scale(devicePixelRatio, devicePixelRatio);
-
-            this.container.appendChild(this.canvas);
-            this.centerContainer();
-
-            console.log(devicePixelRatio);
+        createCanvas(container) {
+            const canvas = document.createElement("canvas");
+            canvas.width = config.width;
+            canvas.height = config.height;
+            container.appendChild(canvas);
+            return canvas;
         }
 
         // self-explanatory
         centerContainer() {
-            this.container.style.width = constants.width + "px";
-            this.container.style.height = constants.height + "px";
-            this.x = (window.innerWidth - constants.width) / 2;
-            this.y = (window.innerHeight - constants.height) / 2;
+            this.container.style.width = config.width + "px";
+            this.container.style.height = config.height + "px";
+            this.x = (window.innerWidth - config.width) / 2;
+            this.y = (window.innerHeight - config.height) / 2;
             this.container.style.marginLeft = this.x + "px";
             this.container.style.marginTop = this.y + "px";
+        }
+
+        enableHighResolutionDisplay() {
+            this.canvas.style.width = config.width + "px";
+            this.canvas.style.height = config.height + "px";
+            this.canvas.width = config.width * devicePixelRatio;
+            this.canvas.height = config.height * devicePixelRatio;
+            this.context.scale(devicePixelRatio, devicePixelRatio);
+            this.context.imageSmoothingEnabled = false;
         }
 
         // Listens to resize event.
         // Centers the canvas container and notify relative parties of this change.
         onResizeWindow() {
-            // constants.onResize();
-            // this.canvas.width = constants.width;
-            // this.canvas.height = constants.height;
-            // camera.onResize();
-            // panel.onResize();
+            config.updateOnResize();
             this.centerContainer();
+            this.enableHighResolutionDisplay();
         }
 
         // Listens to mousedown event.
@@ -117,22 +118,22 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
 
             const collideType = platforms.checkCollision(android);
             switch (collideType) {
-                case constants.COLLIDE_TYPE_JUMP:
+                case config.COLLIDE_TYPE_JUMP:
                     android.jump();
                     break;
-                case constants.COLLIDE_TYPE_BOUNCE:
+                case config.COLLIDE_TYPE_BOUNCE:
                     android.bounce();
                     break;
-                case constants.COLLIDE_TYPE_POWER:
+                case config.COLLIDE_TYPE_POWER:
                     android.powerUp();
                     break;
-                case constants.COLLIDE_TYPE_HURT:
+                case config.COLLIDE_TYPE_HURT:
                     if (!this.isPlaningGameOver()) {
                         android.hurt();
                         this.showGameOver(50);
                     }
                     break;
-                case constants.COLLIDE_TYPE_FALL:
+                case config.COLLIDE_TYPE_FALL:
                     if (!this.isPlaningGameOver()) {
                         android.fall();
                         this.showGameOver(50);
@@ -195,14 +196,14 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
 
         drawScore(ctx) {
             ctx.fillStyle = "#555";
-            ctx.font = `${constants.fontSize(20)}px Arial`;
+            ctx.font = `${config.fontSize(20)}px Arial`;
             ctx.textBaseline = "bottom";
             ctx.textAlign = "left";
-            const padding = constants.relativePixel(60);
+            const padding = config.relativePixel(60);
             ctx.clearRect(0, 0, this.canvas.width, padding + 5);
             ctx.fillText(
                 `Score: ${android.getScore()}    Best: ${this.bestScore}`,
-                constants.relativePixel(40), padding
+                config.relativePixel(40), padding
             );
         }
     }

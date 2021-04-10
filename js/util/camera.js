@@ -1,11 +1,8 @@
-define(["util/constants"], function (constants) {
-    const width = constants.width;
-    const height = constants.height;
+define(["util/config"], function (config) {
+    let width = config.width;
+    let height = config.height;
 
-    const focal = {
-        x: width / 2,
-        y: height / 2,
-    };
+    const focal = {x: 0, y: 0};
     const boxY = {
         high: Math.floor(height * 0.5),
         low: Math.floor(height * 0.92)
@@ -35,6 +32,16 @@ define(["util/constants"], function (constants) {
             y: point.y - focal.y + height / 2,
         };
     }
+
+    function onResize() {
+        width = config.width;
+        height = config.height;
+        boxY.high = Math.floor(height * 0.5);
+        boxY.low = Math.floor(height * 0.92);
+    }
+
+    onResize();
+    config.registerResizeEvent(onResize);
 
     return {
         // The point parameters in follow(), focus(), and moveTo() are all

@@ -1,4 +1,4 @@
-define(["ui/stair", "util/constants"], function (stair, constants) {
+define(["ui/stair", "util/config"], function (stair, config) {
     const sprites = stair.sprites;
 
     // The pool maintains all sorts of platforms so that they won't be
@@ -108,7 +108,7 @@ define(["ui/stair", "util/constants"], function (stair, constants) {
         if (randomizer.mightWantToSlowThingsDown()) {
             return false;
         }
-        return Math.random() < constants.powerUpChance;
+        return Math.random() < config.powerUpChance;
     });
 
     return {

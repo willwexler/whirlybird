@@ -1,4 +1,4 @@
-define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (Sprite, input, camera, constants) {
+define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Sprite, input, camera, config) {
     const sprite = {
         src: "android",
         srcFlip: "android-flip",
@@ -24,13 +24,6 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
             ],
         },
     }
-    const gravity = constants.gravity;
-    const moveVelocity = constants.moveVelocity;
-    const jumpVelocity = constants.jumpVelocity;
-    const bounceVelocity = constants.bounceVelocity;
-    const powerUpVelocity = constants.powerUpVelocity;
-    const powerUpDuration = constants.powerUpDuration;
-    const maxFallingVelocity = constants.maxFallingVelocity;
 
     class Android extends Sprite {
         constructor() {
@@ -45,8 +38,8 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
         // Reset android to original point, clear velocity, animations,
         // and ask for camera's instant attention.
         reset() {
-            this.x = (constants.width - this.w) / 2;
-            this.y = (constants.height - this.h) / 2;
+            this.x = (config.width - this.w) / 2;
+            this.y = (config.height - this.h) / 2;
 
             this.velocity = {x: 0, y: 0};
             this.altitude = 0;
@@ -68,12 +61,12 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
 
         // General behavior of android after stepped on a platform.
         jump() {
-            this.velocity.y = jumpVelocity;
+            this.velocity.y = config.jumpVelocity;
         }
 
         // Particular behavior of android after stepped on a spring.
         bounce() {
-            this.velocity.y = bounceVelocity;
+            this.velocity.y = config.bounceVelocity;
         }
 
         // Android receives a power up as luck would have it.
@@ -111,9 +104,9 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
         // range, and vice versa.
         clampX(x) {
             if (x < -this.w / 2) {
-                return constants.width - this.w / 2;
+                return config.width - this.w / 2;
             }
-            if (x > constants.width - this.w / 2) {
+            if (x > config.width - this.w / 2) {
                 return -this.w / 2;
             }
             return x;
@@ -125,14 +118,15 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
                 if (this.powering) {
                     // When there is a power up, velocity.y shall be constant and not
                     // be affected by gravity.
-                    this.velocity.y = powerUpVelocity;
-                    if (++this.powerFrame >= powerUpDuration) {
+                    this.velocity.y = config.powerUpVelocity;
+                    if (++this.powerFrame >= config.powerUpDuration) {
                         this.powering = false;
                     }
                     this.animPower.update(true);
                 } else {
                     // Gravity changes velocity.y.
-                    this.velocity.y = Math.min(maxFallingVelocity, this.velocity.y + gravity);
+                    this.velocity.y = Math.min(config.maxFallingVelocity,
+                        this.velocity.y + config.gravity);
                 }
                 // Update altitude and Y position in canvas.
                 this.altitude -= this.velocity.y;
@@ -147,7 +141,7 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
                 this.animHurt.update(false, false);
             } else {
                 // Horizontal input, only takes effect if the android is not about to die.
-                this.velocity.x = input.horizontalAxis() * moveVelocity;
+                this.velocity.x = input.horizontalAxis() * config.moveVelocity;
                 this.x = this.clampX(this.x + this.velocity.x);
 
                 // Flip the sprite based on velocity.x. If there isn't any input, the flip
@@ -180,10 +174,10 @@ define(["ui/sprite", "util/input", "util/camera", "util/constants"], function (S
                 super.draw(ctx);
             }
 
-            // this.drawAltitude(ctx);
+            // this.drawDebugAltitude(ctx);
         }
 
-        drawAltitude(ctx) {
+        drawDebugAltitude(ctx) {
             const textX = this.x + this.w / 2;
             const textY = this.y - 10;
             ctx.fillStyle = "#333";

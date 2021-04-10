@@ -1,5 +1,4 @@
-define(["ui/pool", "util/constants"], function (pool, constants) {
-    const gap = constants.platformGap; // gap between two platforms
+define(["ui/pool", "util/config"], function (pool, config) {
     const stairs = [];
 
     let current; // altitude
@@ -7,13 +6,13 @@ define(["ui/pool", "util/constants"], function (pool, constants) {
     // Adds a new platform to the current altitude.
     function add() {
         stairs.push(pool.retrieve(current));
-        current += gap;
+        current += config.platformGap;
     }
 
     // Create enough initial platforms at game's start.
     function init() {
-        const size = Math.ceil(constants.height / gap);
-        const start = -Math.round(constants.height * 0.46);
+        const size = Math.ceil(config.height / config.platformGap);
+        const start = -Math.round(config.height * 0.46);
 
         while (stairs.length) {
             stairs.pop();
@@ -49,15 +48,15 @@ define(["ui/pool", "util/constants"], function (pool, constants) {
             }
             let fall = true;
             for (let stair of stairs) {
-                if (android.y - stair.y < constants.fallingThreshold) {
+                if (android.y - stair.y < config.fallingThreshold) {
                     fall = false;
                     break;
                 }
             }
             if (fall) {
-                return constants.COLLIDE_TYPE_FALL;
+                return config.COLLIDE_TYPE_FALL;
             }
-            return constants.COLLIDE_TYPE_NONE;
+            return config.COLLIDE_TYPE_NONE;
         },
 
         draw: function (ctx) {

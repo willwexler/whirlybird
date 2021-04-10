@@ -1,15 +1,11 @@
 body {
     margin: 0;
     padding: 0;
-    /*background: #f3f3f3;*/
     background: #e9e9ed;
-    /*background: #f8f4ee;*/
 }
 
 #container {
     background: #faf7f3;
-    /*background: #f3f3f3;*/
-    /*border: solid #cfcfcf 1px;*/
     border-radius: 16px;
     box-shadow: 0 0 10px #c3c3c3;
     position: fixed;
