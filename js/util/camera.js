@@ -1,12 +1,15 @@
 define(["util/config"], function (config) {
-    let width = config.width;
-    let height = config.height;
+    let width, height;
 
     const focal = {x: 0, y: 0};
-    const boxY = {
-        high: Math.floor(height * 0.5),
-        low: Math.floor(height * 0.92)
-    };
+    const boxY = {high: 0, low: 0};
+
+    function init() {
+        width = config.width;
+        height = config.height;
+        boxY.high = Math.floor(height * 0.5);
+        boxY.low = Math.floor(height * 0.92);
+    }
 
     // Try to follow a target. If it goes outside of a box range, move the
     // camera so we don't lose it.
@@ -33,15 +36,8 @@ define(["util/config"], function (config) {
         };
     }
 
-    function onResize() {
-        width = config.width;
-        height = config.height;
-        boxY.high = Math.floor(height * 0.5);
-        boxY.low = Math.floor(height * 0.92);
-    }
-
-    onResize();
-    config.registerResizeEvent(onResize);
+    init();
+    config.registerResizeEvent(init);
 
     return {
         // The point parameters in follow(), focus(), and moveTo() are all

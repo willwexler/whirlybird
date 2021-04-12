@@ -1,4 +1,9 @@
-define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Sprite, input, camera, config) {
+define(["ui/sprite", "util/input", "util/camera", "util/config",
+], function (Sprite, input, camera, config) {
+
+    const enableCheats = false;
+    const cheatKey = "KeyZ";
+
     const sprite = {
         src: "android",
         srcFlip: "android-flip",
@@ -29,9 +34,9 @@ define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Spri
         constructor() {
             super(sprite.src);
             this.flippedImg = sprite.srcFlip;
-            this.animPower = super.newAnimation(sprite.animSrc.power, 8);
-            this.animFall = super.newAnimation(sprite.animSrc.fall, 6);
-            this.animHurt = super.newAnimation(sprite.animSrc.hurt, 4);
+            this.animPower = super.newAnimation(sprite.animSrc.power, 8, true);
+            this.animFall = super.newAnimation(sprite.animSrc.fall, 6, true);
+            this.animHurt = super.newAnimation(sprite.animSrc.hurt, 4, false, false);
             this.reset();
         }
 
@@ -56,7 +61,9 @@ define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Spri
             this.animHurt.reset();
             this.hurting = false;
 
-            camera.moveTo(this.getRealPosition());
+            this.overwriteUpdate = false;
+
+            camera.moveTo(this.getRealCenterPosition());
         }
 
         // General behavior of android after stepped on a platform.
@@ -86,16 +93,11 @@ define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Spri
             this.falling = true;
         }
 
-        // Score is based on the max altitude that android has reached to.
-        getScore() {
-            return Math.floor(this.maxAltitude);
-        }
-
         // The absolute position of the android.
-        getRealPosition() {
+        getRealCenterPosition() {
             return {
                 x: this.x + this.w / 2,
-                y: -this.altitude + this.h / 2,
+                y: -this.altitude,
             };
         }
 
@@ -112,7 +114,14 @@ define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Spri
             return x;
         }
 
-        update() {
+        update(deltaFrames) {
+            if (this.overwriteUpdate) {
+                this.x = this.clampX(this.x);
+                this.y = camera.follow(this.getRealCenterPosition()).y - this.h / 2;
+                this.overwriteUpdate = false;
+                return;
+            }
+
             // Update Y position except on hurting animation.
             if (!this.hurting) {
                 if (this.powering) {
@@ -122,27 +131,27 @@ define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Spri
                     if (++this.powerFrame >= config.powerUpDuration) {
                         this.powering = false;
                     }
-                    this.animPower.update(true);
+                    this.animPower.update(deltaFrames);
                 } else {
                     // Gravity changes velocity.y.
                     this.velocity.y = Math.min(config.maxFallingVelocity,
-                        this.velocity.y + config.gravity);
+                        this.velocity.y + config.gravity * deltaFrames);
                 }
                 // Update altitude and Y position in canvas.
-                this.altitude -= this.velocity.y;
+                this.altitude -= this.velocity.y * deltaFrames;
                 this.maxAltitude = Math.max(this.maxAltitude, this.altitude);
-                this.y = camera.follow(this.getRealPosition()).y;
+                this.y = camera.follow(this.getRealCenterPosition()).y - this.h / 2;
             }
 
             // Update X position based on user input.
             if (this.falling) {
-                this.animFall.update(true);
+                this.animFall.update(deltaFrames);
             } else if (this.hurting) {
-                this.animHurt.update(false, false);
+                this.animHurt.update(deltaFrames);
             } else {
                 // Horizontal input, only takes effect if the android is not about to die.
                 this.velocity.x = input.horizontalAxis() * config.moveVelocity;
-                this.x = this.clampX(this.x + this.velocity.x);
+                this.x = this.clampX(this.x + this.velocity.x * deltaFrames);
 
                 // Flip the sprite based on velocity.x. If there isn't any input, the flip
                 // variable should be left as is.
@@ -154,11 +163,49 @@ define(["ui/sprite", "util/input", "util/camera", "util/config"], function (Spri
 
                 // If android is not about to die, update() receives a cheat command to
                 // perform any mid-air jump. To disable this debug feature, modify
-                // input.onCheat() function to always return false.
-                if (input.onCheat()) {
+                // enableCheats to false.
+                if (enableCheats && input.onKey(cheatKey)) {
                     this.jump();
                 }
             }
+        }
+
+        // Predict next position of android.
+        // This is used to detect possible collision of platforms. If a collision is
+        // about to happen, the next frame will be calibrated.
+        predict(deltaFrames) {
+            const nextVelocity = {
+                x: this.velocity.x,
+                y: this.velocity.y + config.gravity * deltaFrames,
+            };
+            const currentCenterPosition = this.getRealCenterPosition();
+            const currentPosition = {
+                x: currentCenterPosition.x - this.w / 2,
+                y: currentCenterPosition.y - this.h / 2,
+            };
+            const nextPosition = {
+                x: currentPosition.x + nextVelocity.x * deltaFrames,
+                y: currentPosition.y + nextVelocity.y * deltaFrames,
+            };
+            if (!this.bindOverwriteNextAltitude) {
+                this.bindOverwriteNextAltitude = this.overwriteNextAltitude.bind(this);
+            }
+            return {
+                ...nextPosition,
+                altitude: -nextPosition.y,
+                velocity: nextVelocity,
+                w: this.w,
+                h: this.h,
+                overwriteNextAltitude: this.bindOverwriteNextAltitude,
+            };
+        }
+
+        // When android collides with a platform, amend its vertical position to
+        // be exactly on top of it at the next frame update.
+        overwriteNextAltitude(nextAndroid, altitude) {
+            this.x = nextAndroid.x;
+            this.altitude = altitude + this.h / 2;
+            this.overwriteUpdate = true;
         }
 
         draw(ctx) {

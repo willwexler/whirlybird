@@ -1,84 +1,131 @@
 define(function () {
     const keycodes = {
-        space: {"32": true},             // Space
-        left: {"65": true, "37": true},  // A, ←
-        right: {"68": true, "39": true}, // D, →
-        up: {"87": true, "38": true},    // W, ↑
-        down: {"83": true, "40": true},  // D, ↓
-        cheats: {"90": true},            // Z
-    }
-    const keys = {
-        space: false,
-        left: false,
-        right: false,
-        up: false,
-        down: false,
-        cheats: false,
-    }
+        left: {"KeyA": true, "ArrowLeft": true},
+        right: {"KeyD": true, "ArrowRight": true},
+        up: {"KeyW": true, "ArrowUp": true},
+        down: {"KeyD": true, "ArrowDown": true},
+    };
+    const keys = {};
+    const axis = {
+        horizontal: 0, // 0: no input;  1: right;  -1: left.
+        vertical: 0, // 0: no input;  1: up;  -1: down.
+    };
 
-    function onKeyDown(e) {
-        onKey(e, true);
-    }
+    const keyEvents = (function () {
+        function onKey(e, flag) {
+            if (keycodes.left[e.code]) {
+                axis.horizontal = flag ? -1 : 0;
+            }
+            if (keycodes.right[e.code]) {
+                axis.horizontal = flag ? 1 : 0;
+            }
+            if (keycodes.up[e.code]) {
+                axis.vertical = flag ? 1 : 0;
+            }
+            if (keycodes.down[e.code]) {
+                axis.vertical = flag ? -1 : 0;
+            }
+            if (!e.repeat) {
+                keys[e.code] = flag;
+            }
+        }
 
-    function onKeyUp(e) {
-        onKey(e, false);
-    }
+        return {
+            down: function (e) {
+                onKey(e, true);
+            },
+            up: function (e) {
+                onKey(e, false);
+            }
+        };
+    })();
 
-    function onKey(e, flag) {
-        if (keycodes.space[e.keyCode] && !e.repeat) {
-            keys.space = flag;
-        }
-        if (keycodes.cheats[e.keyCode] && !e.repeat) {
-            keys.cheats = flag;
-        }
-        if (keycodes.left[e.keyCode]) {
-            keys.left = flag;
-        }
-        if (keycodes.right[e.keyCode]) {
-            keys.right = flag;
-        }
-        if (keycodes.up[e.keyCode]) {
-            keys.up = flag;
-        }
-        if (keycodes.down[e.keyCode]) {
-            keys.down = flag;
-        }
-    }
+    const touchEvents = (function () {
+        // Radius of wheel, used to determine the level of input horizontal/vertical
+        // axis (decimal between -1 and 1).
+        const wheelRadius = Math.round(window.innerWidth * 0.2);
 
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("keyup", onKeyUp);
+        // Set the position of wheel when touch starts.
+        let wheel = null;
+
+        function pointFromTouch(e) {
+            const p = e.touches[0];
+            return {x: p.clientX, y: p.clientY};
+        }
+
+        function deltaToAxis(delta) {
+            let k = Math.abs(delta) / wheelRadius;
+            if (k > 1) {
+                k = 1;
+            }
+            return k * Math.sign(delta);
+        }
+
+        function clearAxis() {
+            axis.horizontal = 0;
+            axis.vertical = 0;
+        }
+
+        return {
+            // Set the position of wheel when touch starts.
+            start: function (e) {
+                wheel = pointFromTouch(e);
+                clearAxis();
+            },
+            // Clear the position of wheel when touch ends.
+            end: function () {
+                wheel = null;
+                clearAxis();
+            },
+            // Calculate how the user is steering the wheel.
+            move: function (e) {
+                if (!wheel) {
+                    console.error("ontouchmove called, but there isn't a wheel!");
+                    return;
+                }
+                const touch = pointFromTouch(e);
+                const delta = {
+                    x: touch.x - wheel.x,
+                    y: touch.y - wheel.y,
+                };
+                axis.horizontal = deltaToAxis(delta.x);
+                axis.vertical = deltaToAxis(-delta.y);
+            },
+        };
+    })();
+
+    document.addEventListener("keydown", keyEvents.down);
+    document.addEventListener("keyup", keyEvents.up);
+    document.addEventListener("touchstart", touchEvents.start);
+    document.addEventListener("touchmove", touchEvents.move);
+    document.addEventListener("touchend", touchEvents.end);
 
     return {
+        // Check whether there has been a Space key pressed.
         onSpace: function () {
-            if (keys.space) {
-                keys.space = false;
+            return this.onKey("Space");
+        },
+
+        onKey: function (code) {
+            if (keys[code]) {
+                keys[code] = false;
                 return true;
             }
-            return keys.space;
-        },
-        onCheat: function () {
             return false;
-            if (keys.cheats) {
-                keys.cheats = false;
-                return true;
-            }
-            return keys.cheats;
         },
+
+        // Axis value between -1 and 1, a negative value indicates left input,
+        // a positive value indicates right input, while a zero value indicates
+        // no input at all.
         horizontalAxis: function () {
-            if (keys.left) {
-                return -1;
-            } else if (keys.right) {
-                return 1;
-            }
-            return 0;
+            return axis.horizontal;
         },
+
+        // Axis value between -1 and 1, a negative value indicates down input,
+        // a positive value indicates up input, while a zero value indicates
+        // no input at all.
         verticalAxis: function () {
-            if (keys.up) {
-                return 1;
-            } else if (keys.down) {
-                return -1;
-            }
-            return 0;
+            return axis.vertical;
         }
     }
 });

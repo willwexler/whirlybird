@@ -10,4 +10,7 @@ body {
     box-shadow: 0 0 10px #c3c3c3;
     position: fixed;
     overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
 }

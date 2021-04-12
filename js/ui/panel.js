@@ -79,14 +79,14 @@ define(["ui/sprite", "util/config"], function (Sprite, config) {
         that = sprites.restart;
         it.x = (config.width - groupWidth) / 2;
         it.y = that.y - gapVertical3 - it.h;
-        it.setAnimation(spritesConfig.egOk.animSrc, animClipDuration);
+        it.setAnimation(spritesConfig.egOk.animSrc, animClipDuration, true);
 
         // setup egCaution
         it = sprites.egCaution;
         that = sprites.egOk;
         it.x = that.x + that.w + gapHorizontal;
         it.y = that.y;
-        it.setAnimation(spritesConfig.egCaution.animSrc, animClipDuration);
+        it.setAnimation(spritesConfig.egCaution.animSrc, animClipDuration, true);
 
         // setup icOk
         it = sprites.icOk;
@@ -119,17 +119,13 @@ define(["ui/sprite", "util/config"], function (Sprite, config) {
     config.registerResizeEvent(placeEverything);
 
     return {
-        update() {
-            sprites.egOk.anim.update(true);
-            sprites.egCaution.anim.update(true);
+        update(deltaFrames) {
+            sprites.egOk.anim.update(deltaFrames);
+            sprites.egCaution.anim.update(deltaFrames);
         },
 
-        drawGameOver(ctx) {
-            draw(ctx, "GAME OVER");
-        },
-
-        draw(ctx) {
-            draw(ctx, "START GAME");
+        draw(ctx, title = "GAME OVER") {
+            draw(ctx, title);
         },
 
         isClickingRestart(point) {

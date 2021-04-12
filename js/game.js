@@ -1,6 +1,5 @@
-define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
-    "util/config", "util/input"], function (
-    android, platforms, ribbon, panel, config, input
+define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
+    "util/input"], function (android, platforms, ribbon, panel, config, input
 ) {
 
     // Maintain/Persist best game score.
@@ -10,13 +9,13 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
             retrieve: function () {
                 const value = localStorage.getItem(key);
                 if (value) {
-                    ribbon.setAltitude(value);
+                    ribbon.setBestScore(value);
                     return value;
                 }
                 return 0;
             },
             store: function (value) {
-                ribbon.setAltitude(value);
+                ribbon.setBestScore(value);
                 localStorage.setItem(key, value);
             }
         };
@@ -38,11 +37,13 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
 
             this.frames = 0;
             this.gameOverAt = 0;
+            this.score = 0;
             this.bestScore = bestScore.retrieve();
             this.bindLoop = this.loop.bind(this);
 
             window.addEventListener("resize", this.onResizeWindow.bind(this));
-            window.addEventListener("mousedown", this.onClickEvent.bind(this));
+            window.addEventListener("click", this.onClickEvent.bind(this));
+            window.addEventListener("touchstart", this.onTouchEvent.bind(this));
         }
 
         // self-explanatory
@@ -70,28 +71,36 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
             this.canvas.width = config.width * devicePixelRatio;
             this.canvas.height = config.height * devicePixelRatio;
             this.context.scale(devicePixelRatio, devicePixelRatio);
+            // This is a pixel game. Sprites should have clean and sharp edges.
             this.context.imageSmoothingEnabled = false;
         }
 
         // Listens to resize event.
-        // Centers the canvas container and notify relative parties of this change.
+        // Center the canvas container and notify relevant parties of this change.
         onResizeWindow() {
             config.updateOnResize();
             this.centerContainer();
             this.enableHighResolutionDisplay();
         }
 
-        // Listens to mousedown event.
+        // Listens to click event.
         onClickEvent(e) {
-            const where = {x: e.x, y: e.y};
-            if (e.target === this.canvas) {
-                where.x -= this.x;
-                where.y -= this.y;
-                if (this.isGameOver()) {
-                    if (panel.isClickingRestart(where)) {
-                        this.restart();
-                    }
-                }
+            this.onClick(e);
+        }
+
+        onTouchEvent(e) {
+            this.onClick(e.touches[0]);
+        }
+
+        onClick(e) {
+            if (!this.isGameOver() || e.target !== this.canvas) {
+                return;
+            }
+            const where = {x: e.clientX, y: e.clientY};
+            where.x -= this.x;
+            where.y -= this.y;
+            if (panel.isClickingRestart(where)) {
+                this.restart();
             }
         }
 
@@ -100,6 +109,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
             cancelAnimationFrame(this.animId);
             this.frames = 0;
             this.gameOverAt = Infinity;
+            this.score = 0;
             android.reset();
             platforms.reset();
             this.loop();
@@ -107,16 +117,28 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
 
         // Updates UI logic at every frame.
         update() {
+            const deltaFrames = config.elapsedFrames();
+            this.frames += deltaFrames;
+
             if (this.isGameOver()) {
-                panel.update();
+                panel.update(deltaFrames);
                 return;
             }
 
-            android.update();
-            platforms.update(this.frames);
+            android.update(deltaFrames);
+            platforms.update(deltaFrames, this.frames);
             ribbon.update();
 
-            const collideType = platforms.checkCollision(android);
+            // Collision check might result to a game-over, therefore score
+            // should be set before checking collision.
+            this.score = config.altitudeToScore(android.maxAltitude);
+
+            // Predict collision of the next frame.
+            if (this.isPlaningGameOver()) {
+                return;
+            }
+            const nextAndroid = android.predict(deltaFrames);
+            const collideType = platforms.checkCollision(nextAndroid);
             switch (collideType) {
                 case config.COLLIDE_TYPE_JUMP:
                     android.jump();
@@ -128,16 +150,12 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
                     android.powerUp();
                     break;
                 case config.COLLIDE_TYPE_HURT:
-                    if (!this.isPlaningGameOver()) {
-                        android.hurt();
-                        this.showGameOver(50);
-                    }
+                    android.hurt();
+                    this.showGameOver(50);
                     break;
                 case config.COLLIDE_TYPE_FALL:
-                    if (!this.isPlaningGameOver()) {
-                        android.fall();
-                        this.showGameOver(50);
-                    }
+                    android.fall();
+                    this.showGameOver(50);
                     break;
                 default:
                     break;
@@ -149,19 +167,17 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
             this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
             if (!this.gameOverAt) { // first
-                panel.draw(this.context);
-                this.drawScore(this.context);
+                panel.draw(this.context, "START GAME");
             } else if (this.isGameOver()) {
-                panel.drawGameOver(this.context);
-                this.drawScore(this.context);
+                panel.draw(this.context, "GAME OVER");
             } else {
                 android.draw(this.context);
                 platforms.draw(this.context);
-                this.drawScore(this.context);
                 if (!this.isPlaningGameOver()) {
                     ribbon.draw(this.context);
                 }
             }
+            this.drawScore(this.context);
         }
 
         loop() {
@@ -169,7 +185,6 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
                 this.restart();
                 return;
             }
-            ++this.frames;
             this.update();
             this.render();
             this.animId = requestAnimationFrame(this.bindLoop);
@@ -179,7 +194,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
         // or after delayed frames.
         showGameOver(delay = 0) {
             this.gameOverAt = this.frames + delay;
-            this.bestScore = Math.max(this.bestScore, android.getScore());
+            this.bestScore = Math.max(this.bestScore, this.score);
             bestScore.store(this.bestScore);
         }
 
@@ -202,7 +217,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel",
             const padding = config.relativePixel(60);
             ctx.clearRect(0, 0, this.canvas.width, padding + 5);
             ctx.fillText(
-                `Score: ${android.getScore()}    Best: ${this.bestScore}`,
+                `Score: ${Math.floor(this.score)}    Best: ${Math.floor(this.bestScore)}`,
                 config.relativePixel(40), padding
             );
         }

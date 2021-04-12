@@ -24,7 +24,7 @@ define(["ui/pool", "util/config"], function (pool, config) {
     }
 
     return {
-        update: function (frames) {
+        update: function (deltaFrames, frames) {
             if (stairs[0].hasGone()) {
                 stairs[0].disable();
                 stairs.shift();
@@ -33,7 +33,7 @@ define(["ui/pool", "util/config"], function (pool, config) {
                 add();
             }
             for (let stair of stairs) {
-                stair.update(frames);
+                stair.update(deltaFrames, frames);
             }
         },
 
@@ -48,7 +48,7 @@ define(["ui/pool", "util/config"], function (pool, config) {
             }
             let fall = true;
             for (let stair of stairs) {
-                if (android.y - stair.y < config.fallingThreshold) {
+                if (stair.altitude - android.altitude < config.fallingThreshold) {
                     fall = false;
                     break;
                 }

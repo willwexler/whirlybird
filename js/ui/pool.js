@@ -25,7 +25,12 @@ define(["ui/stair", "util/config"], function (stair, config) {
                 cached.push(append);
                 // console.log("pool appended", sprite.src, cached.length);
                 return append;
-            }
+            },
+            disableAll: () => {
+                Object.values(this.pool).forEach(arr => {
+                    arr.forEach(it => it.disable());
+                });
+            },
         }
     })();
 
@@ -117,6 +122,7 @@ define(["ui/stair", "util/config"], function (stair, config) {
         },
 
         reset: function () {
+            platformPool.disableAll();
             randomizer.clear();
         }
     };

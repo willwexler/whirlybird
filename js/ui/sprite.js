@@ -188,8 +188,12 @@ define(["util/config"], function (config) {
             console.error("Sprite sheet does not contain " + src);
             return;
         }
+        // ctx.drawImage(this.img, conf.x, conf.y, conf.w, conf.h,
+        //     sprite.x, sprite.y, sprite.w, sprite.h);
         ctx.drawImage(this.img, conf.x, conf.y, conf.w, conf.h,
-            sprite.x, sprite.y, sprite.w, sprite.h);
+            Math.round(sprite.x), Math.round(sprite.y),
+            Math.round(sprite.w), Math.round(sprite.h),
+        );
     };
 
     // Load sprite images separately (only when pack=false).
@@ -217,17 +221,19 @@ define(["util/config"], function (config) {
     }
 
     // Save all instantiated sprites to a bottle. Once the window is resized,
-    // it would be much easier to scale all of the sprites here.
+    // it would be much easier to scale sprites here altogether.
     const bottle = [];
-    config.registerResizeEvent(function () {
+    config.registerResizeEvent(() => {
         for (const sprite of bottle) {
             sprite.onResize();
         }
     });
 
     class Animation {
-        constructor(parent, images, clipDuration) {
+        constructor(parent, images, clipDuration, loop, stays) {
             this.parent = parent;
+            this.loop = loop;
+            this.stays = stays;
             this.init(images, clipDuration);
         }
 
@@ -247,8 +253,8 @@ define(["util/config"], function (config) {
         // Param stays specifies the behavior once animation has ended, if stays
         // equals to true, drawClip() shall draw the last frame of the animation,
         // otherwise it draws nothing after finished.
-        update(loop, stays) {
-            if (loop) {
+        update(deltaFrames) {
+            if (this.loop) {
                 this.animFrames %= this.animDuration;
             }
 
@@ -259,10 +265,10 @@ define(["util/config"], function (config) {
                 }
             }
             if (i >= this.animSrc.length) {
-                i = stays ? this.animSrc.length - 1 : -1;
+                i = this.stays ? this.animSrc.length - 1 : -1;
             }
             this.animIndex = i;
-            ++this.animFrames;
+            this.animFrames += deltaFrames;
         }
 
         drawClip(ctx) {
@@ -291,13 +297,13 @@ define(["util/config"], function (config) {
             }
         }
 
-        setAnimation(images, clipDuration) {
-            this.anim = this.newAnimation(images, clipDuration);
+        setAnimation(images, clipDuration, loop = true, stays = true) {
+            this.anim = this.newAnimation(images, clipDuration, loop, stays);
             return this.anim;
         }
 
-        newAnimation(images, clipDuration) {
-            return new Animation(this, images, clipDuration);
+        newAnimation(images, clipDuration, loop = true, stays = true) {
+            return new Animation(this, images, clipDuration, loop, stays);
         }
 
         draw(ctx, image = this.src) {

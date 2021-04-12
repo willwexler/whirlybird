@@ -14,4 +14,4 @@ Jump on the platforms, avoid the traps and see how much higher you can get.
   over and over.~~
 - [x] ~~Improve support for various resolutions.~~
 - [x] ~~Adjust dynamically on window resize event.~~
-- [ ] Perhaps add mobile support someday.
+- [x] ~~Add mobile support.~~

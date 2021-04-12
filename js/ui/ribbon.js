@@ -7,11 +7,18 @@ define(["ui/sprite", "util/camera", "util/config"], function (Sprite, camera, co
     class Ribbon extends Sprite {
         constructor() {
             super(sprite.src);
-            this.altitude = 0;
+            this.init();
         }
 
-        setAltitude(best) {
-            this.altitude = best;
+        init() {
+            this.altitude = 0;
+            this.w = config.width;
+            config.registerResizeEvent(() => this.w = config.width);
+        }
+
+        setBestScore(best) {
+            this.bestScore = best;
+            this.altitude = config.scoreToAltitude(best);
         }
 
         update() {
@@ -28,7 +35,7 @@ define(["ui/sprite", "util/camera", "util/config"], function (Sprite, camera, co
                 ctx.textBaseline = "bottom";
                 ctx.textAligh = "left";
                 ctx.fillStyle = "#555";
-                ctx.fillText(String(this.altitude), 5, this.y - 5);
+                ctx.fillText(String(Math.floor(this.bestScore)), 5, this.y - 5);
             }
         }
     }

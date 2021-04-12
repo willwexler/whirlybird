@@ -101,35 +101,75 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             "power-up-2",
             "power-up-3",
         ],
-        lucky: function () {
-            return false;
-        }
+        lucky: () => false,
     };
 
     // Randomize the X position of the platforms.
     const randomX = (function () {
-        const spawnPadding = config.platformPadding;
         const random = function (min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
         return function (width) {
+            const spawnPadding = config.platformPadding;
             return random(spawnPadding, config.width - width - spawnPadding);
+        };
+    })();
+
+    // Check if android movement intersects with a platform.
+    const movementIntersect = (function () {
+        function crossProduct(a, b, c) {
+            return (a.x - c.x) * (b.y - c.y) - (a.y - c.y) * (b.x - c.x);
+        }
+
+        return function (line, leftFoot, rightFoot) {
+            if (line.from.y > leftFoot.to.y || line.from.y < leftFoot.from.y) {
+                // y position of the stair is not between the movement.
+                return false;
+            }
+            let p, m, n, prod1, prod2;
+            p = line.from;
+            m = leftFoot.from;
+            n = leftFoot.to;
+            prod1 = crossProduct(m, n, p);
+            if (prod1 === 0) {
+                return true;
+            }
+            p = line.to;
+            prod2 = crossProduct(m, n, p);
+            if (prod1 * prod2 <= 0) {
+                return true;
+            }
+            p = line.from;
+            m = rightFoot.from;
+            n = rightFoot.to;
+            prod2 = crossProduct(m, n, p);
+            if (prod1 * prod2 <= 0) {
+                return true;
+            }
+            p = line.to;
+            prod2 = crossProduct(m, n, p);
+            if (prod1 * prod2 <= 0) {
+                return true;
+            }
+            // If the two endpoints of stair are on the same side of both movement
+            // line, there is no intersect.
+            return false;
         };
     })();
 
     class PowerUp extends Sprite {
         constructor() {
             super(powerUps.src);
-            super.setAnimation(powerUps.animSrc, 6);
+            super.setAnimation(powerUps.animSrc, 6, true);
             this.enabled = false;
         }
 
-        update() {
+        update(deltaFrames) {
             if (!this.enabled) {
                 return;
             }
-            this.anim.update(true);
+            this.anim.update(deltaFrames);
         }
 
         draw(ctx, x, y) {
@@ -162,10 +202,11 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             if (this.powerup) {
                 this.powerup.enabled = powerUps.lucky();
             }
+            this.previousPositions = null;
             this.active = true;
         }
 
-        // If the platform has enter to the canvas from above.
+        // If the platform has entered to the canvas from above.
         hasEntered() {
             return this.y > 0;
         }
@@ -175,7 +216,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return this.y > config.height;
         }
 
-        // Disables the platform, makes it recyclable by an ObjectPooler.
+        // Disable the platform, make it recyclable by an ObjectPooler.
         disable() {
             this.active = false;
         }
@@ -184,18 +225,19 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.moveSpeed = speed;
         }
 
-        // If android is stepping on the platform.
+        // Check if android is stepping on the platform.
         // This returns all type of events causing different behaviors of the
         // android. Like, jump, bounce, power up, and hurt etc.
         isBeingStepped(android) {
-            const flag = android.velocity.y >= 0 &&
-                android.x + android.w > this.x &&
-                android.x < this.x + this.w &&
-                android.y + android.h >= this.y &&
-                android.y + android.h < this.y + this.h;
+            // const flag = this.basicOnStairCheck(android);
+            const flag = this.advancedOnStairCheck(android);
             if (!flag) {
                 return config.COLLIDE_TYPE_NONE;
             }
+            // Android has set foot on a platform, set its precise y position to
+            // be exactly on top of it.
+            android.overwriteNextAltitude(android, this.altitude);
+
             if (this.powerup && this.powerup.enabled) {
                 this.powerup.enabled = false;
                 return config.COLLIDE_TYPE_POWER;
@@ -203,18 +245,88 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return config.COLLIDE_TYPE_JUMP;
         }
 
+        // Basic collision check.
+        /** @deprecated */
+        basicOnStairCheck(android) {
+            if (android.velocity.y < 0) {
+                return false;
+            }
+            const stair = this.getRealPosition();
+            return android.x + android.w > stair.x &&
+                android.x < stair.x + this.w &&
+                android.y + android.h >= stair.y &&
+                android.y + android.h <= stair.y + this.h;
+        }
+
+        // On some low FPS machines, if android is landing too fast, we might
+        // not be able to capture a certain collision due to a missing frame.
+        // Instead of checking collision, this advanced method checks if the
+        // android movement intersects with the platform.
+        advancedOnStairCheck(android) {
+            const stairPosition = this.getRealPosition();
+            const currentPositions = {
+                stair: {x: stairPosition.x, y: stairPosition.y, w: this.w, h: this.h},
+                android: {x: android.x, y: android.y, w: android.w, h: android.h},
+            };
+
+            if (!this.previousPositions || android.velocity.y < 0) {
+                this.previousPositions = currentPositions;
+                return false;
+            }
+
+            const android1 = this.previousPositions.android;
+            const android2 = currentPositions.android;
+            const stair1 = this.previousPositions.stair;
+            const stair2 = currentPositions.stair;
+
+            const leftFootMovement = {
+                from: {
+                    x: android1.x,
+                    y: android1.y + android1.h,
+                    // y: android1.y, // a broader check, not precise
+                },
+                to: {
+                    x: android2.x,
+                    y: android2.y + android2.h,
+                },
+            };
+            const rightFootMovement = {
+                from: {
+                    x: leftFootMovement.from.x + android1.w,
+                    y: leftFootMovement.from.y,
+                },
+                to: {
+                    x: leftFootMovement.to.x + android2.w,
+                    y: leftFootMovement.to.y,
+                },
+            };
+            const stairLine = {
+                from: {
+                    x: Math.min(stair1.x, stair2.x),
+                    y: stair1.y,
+                },
+                to: {
+                    x: Math.max(stair1.x + stair1.w, stair2.x + stair2.w),
+                    y: stair2.y,
+                }
+            };
+
+            this.previousPositions = currentPositions;
+            return movementIntersect(stairLine, leftFootMovement, rightFootMovement);
+        }
+
         getRealPosition() {
             return {x: this.x, y: -this.altitude};
         }
 
-        update(frames) {
+        update(deltaFrames) {
             this.y = camera.focus(this.getRealPosition()).y;
             if (this.powerup && this.powerup.enabled) {
-                this.powerup.update(frames);
+                this.powerup.update(deltaFrames);
             }
             if (this.moveSpeed) {
-                this.x += this.moveSpeed;
-                if (this.x <= 0 || this.x + this.w > config.width) {
+                this.x += this.moveSpeed * deltaFrames;
+                if (this.x <= 0 || this.x + this.w >= config.width) {
                     this.moveSpeed = -this.moveSpeed;
                 }
             }
@@ -248,24 +360,27 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         constructor(altitude) {
             super(sprites[1], altitude);
             this.animDuration = 20;
-            this.animFrame = 0;
+            this.animFrames = 0;
             this.blinkInterval = 80;
             this.easeIn = false;
             this.easeOut = false;
             this.visible = false;
         }
 
-        update(frames) {
-            super.update(frames);
-            const mod = frames % this.blinkInterval;
-            if (mod === 0) {
+        update(deltaFrames, frames) {
+            super.update(deltaFrames);
+            const mod = Math.round(frames) % this.blinkInterval;
+            if (mod >= 0 && mod < this.blinkInterval / 2 && !this.visible) {
                 this.easeIn = true;
-                this.animFrame = 0;
+                this.animFrames = 0;
                 this.visible = true;
-            } else if (mod === this.blinkInterval / 2) {
+            } else if (mod >= this.blinkInterval / 2 && this.visible) {
                 this.easeOut = true;
-                this.animFrame = 0;
+                this.animFrames = 0;
                 this.visible = false;
+            }
+            if (this.easeIn || this.easeOut) {
+                this.animFrames += deltaFrames;
             }
         }
 
@@ -280,8 +395,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         }
 
         drawEaseIn(ctx) {
-            ++this.animFrame;
-            let alpha = 1 / this.animDuration * this.animFrame;
+            let alpha = this.animFrames / this.animDuration;
             if (alpha >= 1) {
                 this.easeIn = false;
                 alpha = 1;
@@ -292,8 +406,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         }
 
         drawEaseOut(ctx) {
-            ++this.animFrame;
-            let alpha = 1 - 1 / this.animDuration * this.animFrame;
+            let alpha = 1 - this.animFrames / this.animDuration;
             if (alpha <= 0) {
                 this.easeOut = false;
                 alpha = 0;
@@ -310,7 +423,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         constructor(altitude) {
             super(sprites[2], altitude);
             this.collapse = false;
-            super.setAnimation(sprites[2].animSrc, 5);
+            super.setAnimation(sprites[2].animSrc, 5, false, false);
         }
 
         reset(altitude) {
@@ -330,10 +443,10 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return flag;
         }
 
-        update(frames) {
-            super.update(frames);
+        update(deltaFrames) {
+            super.update(deltaFrames);
             if (this.collapse) {
-                this.anim.update(false, false);
+                this.anim.update(deltaFrames);
             }
         }
 
@@ -350,7 +463,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     class StairMoving extends Stair {
         constructor(altitude) {
             super(sprites[3], altitude, true);
-            super.setAnimation(sprites[3].animSrc, 8);
+            super.setAnimation(sprites[3].animSrc, 8, true);
             super.startPatrol(config.platformMoveSpeed);
         }
 
@@ -359,9 +472,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             super.startPatrol(config.platformMoveSpeed);
         }
 
-        update(frames) {
-            super.update(frames);
-            this.anim.update(true);
+        update(deltaFrames) {
+            super.update(deltaFrames);
+            this.anim.update(deltaFrames);
         }
 
         draw(ctx) {
@@ -377,7 +490,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         constructor(altitude) {
             super(sprites[4], altitude);
             this.collapse = false;
-            super.setAnimation(sprites[4].animSrc, 4);
+            super.setAnimation(sprites[4].animSrc, 4, false, false);
         }
 
         reset(altitude) {
@@ -397,10 +510,10 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return config.COLLIDE_TYPE_NONE;
         }
 
-        update(frames) {
-            super.update(frames);
+        update(deltaFrames) {
+            super.update(deltaFrames);
             if (this.collapse) {
-                this.anim.update(false, false);
+                this.anim.update(deltaFrames);
             }
         }
 
@@ -434,7 +547,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         constructor(altitude) {
             super(sprites[6], altitude);
             this.bounce = false;
-            super.setAnimation(sprites[6].animSrc, 2);
+            super.setAnimation(sprites[6].animSrc, 2, false, true);
         }
 
         reset(altitude) {
@@ -455,10 +568,10 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return config.COLLIDE_TYPE_NONE;
         }
 
-        update(frames) {
-            super.update(frames);
+        update(deltaFrames) {
+            super.update(deltaFrames);
             if (this.bounce) {
-                this.anim.update(false, true);
+                this.anim.update(deltaFrames);
             }
         }
 
@@ -478,10 +591,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     class StairSlime extends Stair {
         constructor(altitude) {
             super(sprites[7], altitude);
-            super.setAnimation(sprites[7].animSrc, 6);
+            super.setAnimation(sprites[7].animSrc, 6, true);
             super.startPatrol(config.platformMoveSpeed);
             this.kicked = false;
-            this.kickForce = 0.5;
             this.velocityY = 0;
         }
 
@@ -514,14 +626,14 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return i === 1 || i === 2;
         }
 
-        update(frames) {
+        update(deltaFrames) {
             if (this.kicked) {
-                this.velocityY += this.kickForce;
-                this.altitude -= this.velocityY;
+                this.velocityY += config.gravity * deltaFrames;
+                this.altitude -= this.velocityY * deltaFrames;
             }
-            super.update(frames);
+            super.update(deltaFrames);
             if (!this.kicked) {
-                this.anim.update(true);
+                this.anim.update(deltaFrames);
             }
         }
 
