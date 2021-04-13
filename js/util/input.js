@@ -8,7 +8,7 @@ define(function () {
     const keys = {};
     const axis = {
         horizontal: 0, // 0: no input;  1: right;  -1: left.
-        vertical: 0, // 0: no input;  1: up;  -1: down.
+        vertical: 0, // 0: no input;  1: down;  -1: up.
     };
 
     const keyEvents = (function () {
@@ -20,10 +20,10 @@ define(function () {
                 axis.horizontal = flag ? 1 : 0;
             }
             if (keycodes.up[e.code]) {
-                axis.vertical = flag ? 1 : 0;
+                axis.vertical = flag ? -1 : 0;
             }
             if (keycodes.down[e.code]) {
-                axis.vertical = flag ? -1 : 0;
+                axis.vertical = flag ? 1 : 0;
             }
             if (!e.repeat) {
                 keys[e.code] = flag;
@@ -89,7 +89,7 @@ define(function () {
                     y: touch.y - wheel.y,
                 };
                 axis.horizontal = deltaToAxis(delta.x);
-                axis.vertical = deltaToAxis(-delta.y);
+                axis.vertical = deltaToAxis(delta.y);
             },
         };
     })();
@@ -121,8 +121,8 @@ define(function () {
             return axis.horizontal;
         },
 
-        // Axis value between -1 and 1, a negative value indicates down input,
-        // a positive value indicates up input, while a zero value indicates
+        // Axis value between -1 and 1, a negative value indicates up input,
+        // a positive value indicates down input, while a zero value indicates
         // no input at all.
         verticalAxis: function () {
             return axis.vertical;

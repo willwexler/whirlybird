@@ -34,7 +34,7 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         constructor() {
             super(sprite.src);
             this.flippedImg = sprite.srcFlip;
-            this.animPower = super.newAnimation(sprite.animSrc.power, 8, true);
+            this.animPower = super.newAnimation(sprite.animSrc.power, 6, true);
             this.animFall = super.newAnimation(sprite.animSrc.fall, 6, true);
             this.animHurt = super.newAnimation(sprite.animSrc.hurt, 4, false, false);
             this.reset();
@@ -53,13 +53,15 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
 
             this.animPower.reset();
             this.powering = false;
-            this.powerFrame = 0;
+            this.powerFrames = 0;
 
             this.animFall.reset();
             this.falling = false;
 
             this.animHurt.reset();
             this.hurting = false;
+            this.quaking = false;
+            this.quakeFrames = 0;
 
             this.overwriteUpdate = false;
 
@@ -80,12 +82,14 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         // It sprints upwards meanwhile ignores gravity, until a certain amount of frames.
         powerUp() {
             this.powering = true;
-            this.powerFrame = 0;
+            this.powerFrames = 0;
         }
 
         // Game over condition: hurt by thorn or slime.
         hurt() {
             this.hurting = true;
+            this.quaking = true;
+            this.quakeFrames = 0;
         }
 
         // Game over condition: fall off the platforms.
@@ -114,10 +118,14 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
             return x;
         }
 
+        leadCamera() {
+            this.y = camera.follow(this.getRealCenterPosition()).y - this.h / 2;
+        }
+
         update(deltaFrames) {
             if (this.overwriteUpdate) {
                 this.x = this.clampX(this.x);
-                this.y = camera.follow(this.getRealCenterPosition()).y - this.h / 2;
+                this.leadCamera();
                 this.overwriteUpdate = false;
                 return;
             }
@@ -128,19 +136,34 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
                     // When there is a power up, velocity.y shall be constant and not
                     // be affected by gravity.
                     this.velocity.y = config.powerUpVelocity;
-                    if (++this.powerFrame >= config.powerUpDuration) {
+                    this.powerFrames += deltaFrames;
+                    if (this.powerFrames >= config.powerUpDuration) {
                         this.powering = false;
                     }
                     this.animPower.update(deltaFrames);
                 } else {
                     // Gravity changes velocity.y.
-                    this.velocity.y = Math.min(config.maxFallingVelocity,
-                        this.velocity.y + config.gravity * deltaFrames);
+                    if (this.falling) {
+                        this.velocity.y += config.gravity * deltaFrames;
+                    } else {
+                        this.velocity.y = Math.min(
+                            config.maxFallingVelocity,
+                            this.velocity.y + config.gravity * deltaFrames,
+                        );
+                    }
                 }
                 // Update altitude and Y position in canvas.
                 this.altitude -= this.velocity.y * deltaFrames;
                 this.maxAltitude = Math.max(this.maxAltitude, this.altitude);
-                this.y = camera.follow(this.getRealCenterPosition()).y - this.h / 2;
+                this.leadCamera();
+            } else if (this.quaking) {
+                this.quakeFrames += deltaFrames;
+                if (this.quakeFrames < config.quakeDuration) {
+                    camera.quake();
+                } else {
+                    this.quaking = false;
+                    camera.stopQuake();
+                }
             }
 
             // Update X position based on user input.
@@ -226,9 +249,9 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
 
         drawDebugAltitude(ctx) {
             const textX = this.x + this.w / 2;
-            const textY = this.y - 10;
+            const textY = this.y - config.relativePixel(8);
             ctx.fillStyle = "#333";
-            ctx.font = "16px Arial";
+            ctx.font = config.fontSize(16) + "px Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(String(Math.floor(this.altitude)), textX, textY);

@@ -3,7 +3,7 @@ define(["ui/pool", "util/config"], function (pool, config) {
 
     let current; // altitude
 
-    // Adds a new platform to the current altitude.
+    // Add a new platform to the current altitude.
     function add() {
         stairs.push(pool.retrieve(current));
         current += config.platformGap;
@@ -25,29 +25,28 @@ define(["ui/pool", "util/config"], function (pool, config) {
 
     return {
         update: function (deltaFrames, frames) {
-            if (stairs[0].hasGone()) {
-                stairs[0].disable();
-                stairs.shift();
-            }
-            if (stairs[stairs.length - 1].hasEntered()) {
+            while (stairs[stairs.length - 1].hasEntered()) {
                 add();
             }
-            for (let stair of stairs) {
+            while (stairs[0].hasGone()) {
+                stairs.shift().disable();
+            }
+            for (const stair of stairs) {
                 stair.update(deltaFrames, frames);
             }
         },
 
         // Check if android shall collide with any platform, also check if
-        // there's no platforms underneath it.
+        // there are no platforms underneath it.
         checkCollision(android) {
-            for (let stair of stairs) {
+            for (const stair of stairs) {
                 const flag = stair.isBeingStepped(android);
                 if (flag) {
                     return flag;
                 }
             }
             let fall = true;
-            for (let stair of stairs) {
+            for (const stair of stairs) {
                 if (stair.altitude - android.altitude < config.fallingThreshold) {
                     fall = false;
                     break;
@@ -60,9 +59,7 @@ define(["ui/pool", "util/config"], function (pool, config) {
         },
 
         draw: function (ctx) {
-            stairs.forEach(stair => {
-                stair.draw(ctx);
-            });
+            stairs.forEach(it => it.draw(ctx));
         },
 
         reset: function () {

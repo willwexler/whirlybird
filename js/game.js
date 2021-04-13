@@ -8,16 +8,106 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         return {
             retrieve: function () {
                 const value = localStorage.getItem(key);
-                if (value) {
-                    ribbon.setBestScore(value);
-                    return value;
-                }
-                return 0;
+                return value ? value : 0;
             },
             store: function (value) {
-                ribbon.setBestScore(value);
                 localStorage.setItem(key, value);
             }
+        };
+    })();
+
+    // Title bar, draws scores, FPS text.
+    const titleBar = (function () {
+        const debuggable = true;
+        const fpsText = {
+            x: 0, y: 0, w: 0, h: 0,
+            clickBox: {x: 0, y: 0, w: 0, h: 0},
+            clickInterval: 600,
+            clickStreak: 6,
+            clickCount: 0,
+            lastClickTime: 0,
+        };
+
+        fpsText.isClickingMe = function (point) {
+            return point.x > this.clickBox.x &&
+                point.x < this.clickBox.x + this.clickBox.w &&
+                point.y > this.clickBox.y &&
+                point.y < this.clickBox.y + this.clickBox.h;
+        };
+        fpsText.strikethrough = function (ctx) {
+            ctx.strokeStyle = ctx.fillStyle;
+            ctx.strokeRect(this.x, this.y + this.h / 2, this.w, 1);
+        };
+        fpsText.strokeBox = function (ctx) {
+            ctx.strokeStyle = "red";
+            ctx.strokeRect(this.clickBox.x, this.clickBox.y,
+                this.clickBox.w, this.clickBox.h);
+        };
+        fpsText.onClick = function (point) {
+            if (!this.isClickingMe(point)) {
+                return;
+            }
+            const now = performance.now();
+            if (!this.lastClickTime) {
+                this.lastClickTime = now;
+                this.clickCount = 1;
+                return;
+            }
+            if (now - this.lastClickTime < this.clickInterval) {
+                if (++this.clickCount >= this.clickStreak) {
+                    this.clickCount = 0;
+                    const flag = config.toggleFramerateCalibration();
+                    alert((flag ? "Enabled" : "Disabled") + " framerate calibration.");
+                }
+            } else {
+                this.clickCount = 1;
+            }
+            this.lastClickTime = now;
+        };
+
+        // Reset text box after resize.
+        config.registerResizeEvent(() => fpsText.w = 0);
+
+        return {
+            draw: function (ctx, score, bestScore) {
+                const paddingTop = config.relativePixel(60);
+                const paddingLeft = config.relativePixel(40);
+                const fontSize = config.fontSize(20);
+
+                ctx.fillStyle = "#555";
+                ctx.font = `${fontSize}px Arial`;
+                ctx.textBaseline = "bottom";
+                ctx.textAlign = "left";
+                ctx.clearRect(0, 0, config.width, paddingTop + 5);
+                ctx.fillText(
+                    `Score: ${Math.floor(score)}    Best: ${Math.floor(bestScore)}`,
+                    paddingLeft, paddingTop
+                );
+                ctx.textAlign = "right";
+                ctx.fillText(`FPS: ${config.fps}`, config.width - paddingLeft, paddingTop);
+                if (!fpsText.w) {
+                    fpsText.w = ctx.measureText("FPS: 00").width;
+                    fpsText.x = config.width - paddingLeft - fpsText.w;
+                    fpsText.h = config.relativePixel(24);
+                    fpsText.y = paddingTop - fpsText.h;
+                    const pad = fpsText.h;
+                    fpsText.clickBox = {
+                        x: fpsText.x - pad,
+                        y: fpsText.y - pad,
+                        w: fpsText.w + pad * 2,
+                        h: fpsText.h + pad * 2,
+                    }
+                }
+                if (!config.hasEnabledFramerateCalibration()) {
+                    fpsText.strikethrough(ctx);
+                }
+                // fpsText.strokeBox(ctx);
+            },
+            onClick(point) {
+                if (debuggable) {
+                    fpsText.onClick(point);
+                }
+            },
         };
     })();
 
@@ -25,7 +115,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         constructor(container) {
             this.container = container;
             this.init();
-            this.loop();
+            this.start();
             // this.restart();
         }
 
@@ -39,14 +129,12 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             this.gameOverAt = 0;
             this.score = 0;
             this.bestScore = bestScore.retrieve();
-            this.bindLoop = this.loop.bind(this);
 
             window.addEventListener("resize", this.onResizeWindow.bind(this));
-            window.addEventListener("click", this.onClickEvent.bind(this));
-            window.addEventListener("touchstart", this.onTouchEvent.bind(this));
+            this.canvas.addEventListener("click", this.onClickEvent.bind(this));
+            this.canvas.addEventListener("touchstart", this.onTouchEvent.bind(this));
         }
 
-        // self-explanatory
         createCanvas(container) {
             const canvas = document.createElement("canvas");
             canvas.width = config.width;
@@ -55,7 +143,6 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             return canvas;
         }
 
-        // self-explanatory
         centerContainer() {
             this.container.style.width = config.width + "px";
             this.container.style.height = config.height + "px";
@@ -89,30 +176,48 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         }
 
         onTouchEvent(e) {
+            // Some mobile devices simulate mouse clicks from touches. This avoids
+            // double-click.
+            e.preventDefault();
             this.onClick(e.touches[0]);
         }
 
         onClick(e) {
-            if (!this.isGameOver() || e.target !== this.canvas) {
+            if (e.target !== this.canvas) {
                 return;
             }
             const where = {x: e.clientX, y: e.clientY};
             where.x -= this.x;
             where.y -= this.y;
-            if (panel.isClickingRestart(where)) {
+            if (this.isGameOver() && panel.isClickingRestart(where)) {
                 this.restart();
             }
+            titleBar.onClick(where);
+        }
+
+        start() {
+            config.throttleFPS(() => {
+                this.update();
+                this.render();
+            }, 0);
+
+            // const loop = function () {
+            //     this.update();
+            //     this.render();
+            //     requestAnimationFrame(loop);
+            // }.bind(this);
+            //
+            // requestAnimationFrame(loop);
         }
 
         // Resets everything and restart the game.
         restart() {
-            cancelAnimationFrame(this.animId);
             this.frames = 0;
             this.gameOverAt = Infinity;
             this.score = 0;
             android.reset();
             platforms.reset();
-            this.loop();
+            ribbon.setBestScore(this.bestScore);
         }
 
         // Updates UI logic at every frame.
@@ -122,6 +227,9 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
 
             if (this.isGameOver()) {
                 panel.update(deltaFrames);
+                if (input.onSpace()) {
+                    this.restart();
+                }
                 return;
             }
 
@@ -173,21 +281,9 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             } else {
                 android.draw(this.context);
                 platforms.draw(this.context);
-                if (!this.isPlaningGameOver()) {
-                    ribbon.draw(this.context);
-                }
+                ribbon.draw(this.context);
             }
-            this.drawScore(this.context);
-        }
-
-        loop() {
-            if (this.isGameOver() && input.onSpace()) {
-                this.restart();
-                return;
-            }
-            this.update();
-            this.render();
-            this.animId = requestAnimationFrame(this.bindLoop);
+            titleBar.draw(this.context, this.score, this.bestScore);
         }
 
         // showGameOver puts current frame to the GameOver frame (arg: gameOverAt),
@@ -207,19 +303,6 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         // Game is ended if the current frame has passed the GameOver frame.
         isGameOver() {
             return this.frames >= this.gameOverAt;
-        }
-
-        drawScore(ctx) {
-            ctx.fillStyle = "#555";
-            ctx.font = `${config.fontSize(20)}px Arial`;
-            ctx.textBaseline = "bottom";
-            ctx.textAlign = "left";
-            const padding = config.relativePixel(60);
-            ctx.clearRect(0, 0, this.canvas.width, padding + 5);
-            ctx.fillText(
-                `Score: ${Math.floor(this.score)}    Best: ${Math.floor(this.bestScore)}`,
-                config.relativePixel(40), padding
-            );
         }
     }
 });

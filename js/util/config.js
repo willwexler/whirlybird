@@ -13,6 +13,12 @@ define(function () {
             powerUpDuration: 99,
             // The chance of the powerUp props appear on the platform.
             powerUpChance: 0.15,
+            // Duration frames of one PowerUp joggle.
+            powerUpJoggleDuration: 12,
+            // Duration frames of one slime joggle.
+            slimeJoggleDuration: 12,
+            // How many frames should camera shake when android is hurt.
+            quakeDuration: 22,
         },
         // Resizable exported values.
         resizable: {
@@ -35,9 +41,16 @@ define(function () {
             // Some platforms are constantly moving. This value specifies the speed
             // of them.
             platformMoveSpeed: 1.5,
+            // Range of PowerUp prop's vertical joggle.
+            powerUpJoggleDistance: 2,
+            // Range of slime's joggle.
+            slimeJoggleDistance: 3,
             // Falling logic will be triggered if the android's position is
             // fallingThreshold lower than every platform.
             fallingThreshold: 100,
+            // How much should camera shake when android is hurt.
+            quakeDeltaX: 2,
+            quakeDeltaY: 4,
         },
         // Those fields should always be a integer.
         int: ["width", "height", "platformPadding", "platformGap", "fallingThreshold"],
@@ -56,6 +69,22 @@ define(function () {
         })(navigator.userAgent || navigator.vendor || window.opera);
     };
 
+    const fps = {
+        second: 1000,
+        update: {
+            interval: 200, // fps update interval
+            last: 0,       // last fps update
+            count: 0,      // frames since last fps update
+            then: 0,       // last frame
+        },
+        throttle: {
+            then: 0,
+            fps: 0,
+            callback: () => {
+            },
+        },
+    };
+
     const exports = {
         COLLIDE_TYPE_FALL: -2,
         COLLIDE_TYPE_HURT: -1,
@@ -64,6 +93,7 @@ define(function () {
         COLLIDE_TYPE_BOUNCE: 2,
         COLLIDE_TYPE_POWER: 3,
 
+        fps: 0,
         ...settings.static,
         ...settings.resizable,
     };
@@ -75,20 +105,78 @@ define(function () {
     exports.altitudeToScore = altitude => altitude / settings.ratio;
     exports.scoreToAltitude = score => score * settings.ratio;
 
+    // Throttle rAF to a specific framerate.
+    exports.throttleFPS = function (callback, throttle) {
+        fps.throttle.callback = callback;
+        fps.throttle.fps = throttle;
+
+        function loop() {
+            requestAnimationFrame(loop);
+
+            if (!fps.throttle.fps) {
+                fps.throttle.callback();
+                return;
+            }
+
+            const now = performance.now();
+            if (!fps.throttle.then) {
+                fps.throttle.then = now;
+                fps.throttle.callback();
+                return;
+            }
+
+            const interval = fps.second / fps.throttle.fps;
+            const elapsed = now - fps.throttle.then;
+            if (elapsed > interval) {
+                fps.throttle.then = now - elapsed % interval;
+                fps.throttle.callback();
+            }
+        }
+
+        requestAnimationFrame(loop);
+    };
+
     // Return elapsed frames since last call.
     exports.elapsedFrames = function () {
+        const now = performance.now();
+        if (!fps.update.then) {
+            // function's first call, setup initial values.
+            fps.update.then = now;
+            fps.update.last = now;
+            fps.update.count = 0;
+            return 1;
+        }
+
+        // const timeElapsed = now - fps.update.then;
+        // if (now - fps.update.last >= fps.update.interval) {
+        //     fps.update.last = now;
+        //     exports.fps = Math.round(fps.second / timeElapsed);
+        // }
+
+        let timeElapsed = now - fps.update.last;
+        ++fps.update.count;
+        if (timeElapsed >= fps.update.interval) {
+            exports.fps = Math.round(fps.second / (timeElapsed / fps.update.count));
+            fps.update.last = now;
+            fps.update.count = 0;
+        }
+
+        timeElapsed = now - fps.update.then;
+        fps.update.then = now;
+        return settings.enableFramerateCalibration ?
+            timeElapsed * settings.fps / fps.second : 1;
+    };
+
+    exports.hasEnabledFramerateCalibration = function () {
+        return settings.enableFramerateCalibration;
+    }
+
+    exports.toggleFramerateCalibration = function () {
         if (!settings.enableFramerateCalibration) {
-            return 1;
+            fps.update.then = 0;
         }
-        this.now = performance.now();
-        if (!this.then) {
-            this.then = this.now;
-            return 1;
-        }
-        const timeElapsed = this.now - this.then;
-        const framesElapsed = timeElapsed * settings.fps / 1000;
-        this.then = this.now;
-        return framesElapsed;
+        return settings.enableFramerateCalibration =
+            !settings.enableFramerateCalibration;
     };
 
     exports.registerResizeEvent = function (fn) {

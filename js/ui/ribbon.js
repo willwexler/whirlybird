@@ -33,9 +33,9 @@ define(["ui/sprite", "util/camera", "util/config"], function (Sprite, camera, co
                 super.draw(ctx);
                 ctx.font = `${config.fontSize(14)}px Arial`;
                 ctx.textBaseline = "bottom";
-                ctx.textAligh = "left";
+                ctx.textAlign = "left";
                 ctx.fillStyle = "#555";
-                ctx.fillText(String(Math.floor(this.bestScore)), 5, this.y - 5);
+                ctx.fillText("Best: " + Math.floor(this.bestScore), 5, this.y - 5);
             }
         }
     }

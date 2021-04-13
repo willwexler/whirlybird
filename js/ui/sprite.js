@@ -225,7 +225,7 @@ define(["util/config"], function (config) {
     const bottle = [];
     config.registerResizeEvent(() => {
         for (const sprite of bottle) {
-            sprite.onResize();
+            sprite.measure();
         }
     });
 
@@ -283,11 +283,11 @@ define(["util/config"], function (config) {
         constructor(src) {
             this.src = src;
             this.w = this.h = this.x = this.y = 0;
-            this.onResize();
+            this.measure();
             bottle.push(this);
         }
 
-        onResize() {
+        measure() {
             const conf = spriteSheet.get(this.src);
             if (conf) {
                 this.w = config.relativePixel(conf.w);

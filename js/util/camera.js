@@ -2,6 +2,7 @@ define(["util/config"], function (config) {
     let width, height;
 
     const focal = {x: 0, y: 0};
+    const focalCopy = {x: 0, y: 0};
     const boxY = {high: 0, low: 0};
 
     function init() {
@@ -21,10 +22,12 @@ define(["util/config"], function (config) {
             // Move the camera up.
             const delta = boxY.high - relative.y;
             focal.y -= delta;
+            focalCopy.y -= delta;
         } else if (relative.y > boxY.low) {
             // Move the camera down.
             const delta = relative.y - boxY.low;
             focal.y += delta;
+            focalCopy.y += delta;
         }
     }
 
@@ -50,14 +53,26 @@ define(["util/config"], function (config) {
             return relativePosition(point);
         },
         moveTo: function (point) {
-            focal.x = point.x;
-            focal.y = point.y;
+            focal.x = focalCopy.x = point.x;
+            focal.y = focalCopy.y = point.y;
             return relativePosition(point);
         },
 
+        // Is view capturable by camera.
         canFitIn: function (relativePos) {
             return relativePos.x >= 0 && relativePos.x < width &&
                 relativePos.y >= 0 && relativePos.y < height;
+        },
+
+        // Shake the camera at a certain range.
+        quake: function () {
+            focal.x = focalCopy.x + config.quakeDeltaX * (Math.random() - 0.5);
+            focal.y = focalCopy.y + config.quakeDeltaY * (Math.random() - 0.5);
+        },
+        // Restore camera's position after shaking.
+        stopQuake: function () {
+            focal.x = focalCopy.x;
+            focal.y = focalCopy.y;
         },
     }
 });

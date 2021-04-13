@@ -153,16 +153,45 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
                 return true;
             }
             // If the two endpoints of stair are on the same side of both movement
-            // line, there is no intersect.
+            // lines, there is no intersect.
             return false;
         };
     })();
+
+    class Joggle {
+        constructor(duration) {
+            this.duration = duration;
+            this.direction = 1;
+            this.frameTimer = 0;
+        }
+
+        reset() {
+            this.direction = 1;
+            this.frameTimer = 0;
+        }
+
+        deltaDistance(deltaFrames, joggleDistance) {
+            this.frameTimer += deltaFrames;
+            if (this.frameTimer > this.duration) {
+                this.direction = -this.direction;
+            }
+            this.frameTimer %= this.duration;
+            return this.direction * joggleDistance *
+                (this.frameTimer / this.duration);
+        }
+    }
 
     class PowerUp extends Sprite {
         constructor() {
             super(powerUps.src);
             super.setAnimation(powerUps.animSrc, 6, true);
+            this.joggle = new Joggle(config.powerUpJoggleDuration);
+            this.deltaY = 0;
             this.enabled = false;
+        }
+
+        reset() {
+            this.joggle.reset();
         }
 
         update(deltaFrames) {
@@ -170,6 +199,8 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
                 return;
             }
             this.anim.update(deltaFrames);
+            this.deltaY = this.joggle.deltaDistance(deltaFrames,
+                config.powerUpJoggleDistance);
         }
 
         draw(ctx, x, y) {
@@ -177,7 +208,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
                 return;
             }
             this.x = x;
-            this.y = y;
+            this.y = y + this.deltaY;
             this.anim.drawClip(ctx);
         }
     }
@@ -198,8 +229,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         setup(altitude) {
             this.x = randomX(this.w);
             this.altitude = altitude;
-            this.y = camera.focus(this.getRealPosition());
+            this.requestCameraAttention();
             if (this.powerup) {
+                this.powerup.reset();
                 this.powerup.enabled = powerUps.lucky();
             }
             this.previousPositions = null;
@@ -208,11 +240,13 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
 
         // If the platform has entered to the canvas from above.
         hasEntered() {
+            this.requestCameraAttention();
             return this.y > 0;
         }
 
         // If the platform has left from the canvas bottom.
         hasGone() {
+            this.requestCameraAttention();
             return this.y > config.height;
         }
 
@@ -229,7 +263,6 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         // This returns all type of events causing different behaviors of the
         // android. Like, jump, bounce, power up, and hurt etc.
         isBeingStepped(android) {
-            // const flag = this.basicOnStairCheck(android);
             const flag = this.advancedOnStairCheck(android);
             if (!flag) {
                 return config.COLLIDE_TYPE_NONE;
@@ -246,12 +279,10 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         }
 
         // Basic collision check.
-        /** @deprecated */
-        basicOnStairCheck(android) {
+        basicOnStairCheck(android, stair) {
             if (android.velocity.y < 0) {
                 return false;
             }
-            const stair = this.getRealPosition();
             return android.x + android.w > stair.x &&
                 android.x < stair.x + this.w &&
                 android.y + android.h >= stair.y &&
@@ -272,6 +303,13 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             if (!this.previousPositions || android.velocity.y < 0) {
                 this.previousPositions = currentPositions;
                 return false;
+            }
+
+            // If the basic collision check passes, there wouldn't be any need
+            // for further calculation.
+            if (this.basicOnStairCheck(android, stairPosition)) {
+                this.previousPositions = currentPositions;
+                return true;
             }
 
             const android1 = this.previousPositions.android;
@@ -319,16 +357,32 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return {x: this.x, y: -this.altitude};
         }
 
+        requestCameraAttention() {
+            const p = camera.focus(this.getRealPosition());
+            this.x = p.x;
+            this.y = p.y;
+        }
+
         update(deltaFrames) {
-            this.y = camera.focus(this.getRealPosition()).y;
+            this.requestCameraAttention();
             if (this.powerup && this.powerup.enabled) {
                 this.powerup.update(deltaFrames);
             }
             if (this.moveSpeed) {
                 this.x += this.moveSpeed * deltaFrames;
-                if (this.x <= 0 || this.x + this.w >= config.width) {
-                    this.moveSpeed = -this.moveSpeed;
-                }
+                this.clampX();
+            }
+        }
+
+        // Turn around after hit the border of the canvas.
+        clampX() {
+            const min = 0, max = config.width - this.w;
+            if (this.x <= min) {
+                this.x = min;
+                this.moveSpeed = -this.moveSpeed;
+            } else if (this.x >= max) {
+                this.x = max;
+                this.moveSpeed = -this.moveSpeed;
             }
         }
 
@@ -340,7 +394,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         drawPowerUp(ctx) {
             if (this.powerup && this.powerup.enabled) {
                 const x = (this.w - this.powerup.w) / 2 + this.x;
-                const y = this.y - this.powerup.h - 10;
+                const y = this.y - this.powerup.h - config.relativePixel(10);
                 this.powerup.draw(ctx, x, y);
             }
         }
@@ -362,6 +416,14 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.animDuration = 20;
             this.animFrames = 0;
             this.blinkInterval = 80;
+            this.easeIn = false;
+            this.easeOut = false;
+            this.visible = false;
+        }
+
+        reset(altitude) {
+            super.reset(altitude);
+            this.animFrames = 0;
             this.easeIn = false;
             this.easeOut = false;
             this.visible = false;
@@ -463,7 +525,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     class StairMoving extends Stair {
         constructor(altitude) {
             super(sprites[3], altitude, true);
-            super.setAnimation(sprites[3].animSrc, 8, true);
+            super.setAnimation(sprites[3].animSrc, 6, true);
             super.startPatrol(config.platformMoveSpeed);
         }
 
@@ -593,6 +655,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             super(sprites[7], altitude);
             super.setAnimation(sprites[7].animSrc, 6, true);
             super.startPatrol(config.platformMoveSpeed);
+            this.joggle = new Joggle(config.slimeJoggleDuration);
             this.kicked = false;
             this.velocityY = 0;
         }
@@ -603,6 +666,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.kicked = false;
             this.velocityY = 0;
             this.anim.reset();
+            this.joggle.reset();
         }
 
         isBeingStepped(android) {
@@ -634,6 +698,8 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             super.update(deltaFrames);
             if (!this.kicked) {
                 this.anim.update(deltaFrames);
+                this.y += this.joggle.deltaDistance(deltaFrames,
+                    config.slimeJoggleDistance);
             }
         }
 
