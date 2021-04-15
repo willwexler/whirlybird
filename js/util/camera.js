@@ -10,6 +10,12 @@ define(["util/config"], function (config) {
         height = config.height;
         boxY.high = Math.floor(height * 0.5);
         boxY.low = Math.floor(height * 0.92);
+        reset();
+    }
+
+    function reset() {
+        focal.x = focalCopy.x = width / 2;
+        focal.y = focalCopy.y = height / 2;
     }
 
     // Try to follow a target. If it goes outside of a box range, move the
@@ -43,18 +49,16 @@ define(["util/config"], function (config) {
     config.registerResizeEvent(init);
 
     return {
-        // The point parameters in follow(), focus(), and moveTo() are all
-        // absolute positions.
+        reset: function () {
+            reset();
+        },
+
+        // The point parameters in follow(), focus() are all absolute positions.
         follow: function (point) {
             lookAt(point);
             return relativePosition(point);
         },
         focus: function (point) {
-            return relativePosition(point);
-        },
-        moveTo: function (point) {
-            focal.x = focalCopy.x = point.x;
-            focal.y = focalCopy.y = point.y;
             return relativePosition(point);
         },
 

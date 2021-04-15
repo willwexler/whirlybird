@@ -8,11 +8,18 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         src: "android",
         srcFlip: "android-flip",
         animSrc: {
-            power: [
-                "android-power-up-1",
-                "android-power-up-2",
-                "android-power-up-3",
-            ],
+            power: {
+                src: [
+                    "android-power-up-1",
+                    "android-power-up-2",
+                    "android-power-up-3",
+                ],
+                flip: [
+                    "android-power-up-flip-1",
+                    "android-power-up-flip-2",
+                    "android-power-up-flip-3",
+                ],
+            },
             fall: [
                 "android-fall-1",
                 "android-fall-2",
@@ -28,15 +35,22 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
                 "android-hurt-8",
             ],
         },
-    }
+    };
+
+    const status = {
+        DEFAULT: "default",
+        POWERING: "powering",
+        HURTING: "hurting",
+        FALLING: "falling",
+    };
 
     class Android extends Sprite {
         constructor() {
             super(sprite.src);
-            this.flippedImg = sprite.srcFlip;
-            this.animPower = super.newAnimation(sprite.animSrc.power, 6, true);
-            this.animFall = super.newAnimation(sprite.animSrc.fall, 6, true);
-            this.animHurt = super.newAnimation(sprite.animSrc.hurt, 4, false, false);
+            this.animPower = super.newAnimation(sprite.animSrc.power.src, 6).loop();
+            this.animFall = super.newAnimation(sprite.animSrc.fall, 6).loop();
+            this.animHurt = super.newAnimation(sprite.animSrc.hurt, 4);
+            this.bindOverwriteNextAltitude = this.overwriteNextAltitude.bind(this);
             this.reset();
         }
 
@@ -52,20 +66,15 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
             this.flip = false;
 
             this.animPower.reset();
-            this.powering = false;
-            this.powerFrames = 0;
-
             this.animFall.reset();
-            this.falling = false;
-
             this.animHurt.reset();
-            this.hurting = false;
-            this.quaking = false;
-            this.quakeFrames = 0;
 
+            this.staus = status.DEFAULT;
+            this.generalFrameCounter = 0;
+            this.isCameraShaking = false;
             this.overwriteUpdate = false;
 
-            camera.moveTo(this.getRealCenterPosition());
+            camera.reset();
         }
 
         // General behavior of android after stepped on a platform.
@@ -81,20 +90,23 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         // Android receives a power up as luck would have it.
         // It sprints upwards meanwhile ignores gravity, until a certain amount of frames.
         powerUp() {
-            this.powering = true;
-            this.powerFrames = 0;
+            this.generalFrameCounter = 0;
+            this.staus = status.POWERING;
+            this.animPower.setSource(this.flip ?
+                sprite.animSrc.power.flip :
+                sprite.animSrc.power.src);
         }
 
         // Game over condition: hurt by thorn or slime.
         hurt() {
-            this.hurting = true;
-            this.quaking = true;
-            this.quakeFrames = 0;
+            this.generalFrameCounter = 0;
+            this.isCameraShaking = true;
+            this.staus = status.HURTING;
         }
 
         // Game over condition: fall off the platforms.
         fall() {
-            this.falling = true;
+            this.staus = status.FALLING;
         }
 
         // The absolute position of the android.
@@ -124,73 +136,100 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
 
         update(deltaFrames) {
             if (this.overwriteUpdate) {
+                // Mandatorily overwrite android's position. This is typically used
+                // by a collision event to correct android's position to be exactly
+                // on top of a platform.
                 this.x = this.clampX(this.x);
                 this.leadCamera();
                 this.overwriteUpdate = false;
                 return;
             }
 
-            // Update Y position except on hurting animation.
-            if (!this.hurting) {
-                if (this.powering) {
-                    // When there is a power up, velocity.y shall be constant and not
-                    // be affected by gravity.
+            switch (this.staus) {
+                case status.DEFAULT:
+                    // Android position is affected by gravity and user's horizontal
+                    // input.
+                    this.applyHorizontalMovement(deltaFrames);
+                    this.applyVerticalMovement(deltaFrames, config.gravity,
+                        config.maxFallingVelocity);
+
+                    // If android is not about to die, update() receives a cheat
+                    // command to perform any mid-air jump. To disable this debug
+                    // feature, modify enableCheats to false.
+                    if (enableCheats && input.onKey(cheatKey)) {
+                        this.jump();
+                    }
+                    break;
+                case status.POWERING:
+                    // When there is a power up, velocity.y shall be constant and
+                    // not be affected by gravity. User's horizontal input still
+                    // takes effect.
                     this.velocity.y = config.powerUpVelocity;
-                    this.powerFrames += deltaFrames;
-                    if (this.powerFrames >= config.powerUpDuration) {
-                        this.powering = false;
+                    this.generalFrameCounter += deltaFrames;
+                    if (this.generalFrameCounter >= config.powerUpDuration) {
+                        this.staus = status.DEFAULT;
                     }
                     this.animPower.update(deltaFrames);
-                } else {
-                    // Gravity changes velocity.y.
-                    if (this.falling) {
-                        this.velocity.y += config.gravity * deltaFrames;
-                    } else {
-                        this.velocity.y = Math.min(
-                            config.maxFallingVelocity,
-                            this.velocity.y + config.gravity * deltaFrames,
-                        );
+                    this.applyHorizontalMovement(deltaFrames);
+                    this.applyVerticalMovement(deltaFrames);
+                    break;
+                case status.HURTING:
+                    // When android is hurting, neither gravity nor user input will
+                    // be able to affect its position.
+                    this.animHurt.update(deltaFrames);
+
+                    // Camera shakes for a short amount of time.
+                    if (this.isCameraShaking) {
+                        this.generalFrameCounter += deltaFrames;
+                        if (this.generalFrameCounter < config.quakeDuration) {
+                            camera.quake();
+                        } else {
+                            this.isCameraShaking = false;
+                            camera.stopQuake();
+                        }
                     }
-                }
-                // Update altitude and Y position in canvas.
-                this.altitude -= this.velocity.y * deltaFrames;
-                this.maxAltitude = Math.max(this.maxAltitude, this.altitude);
-                this.leadCamera();
-            } else if (this.quaking) {
-                this.quakeFrames += deltaFrames;
-                if (this.quakeFrames < config.quakeDuration) {
-                    camera.quake();
-                } else {
-                    this.quaking = false;
-                    camera.stopQuake();
+                    break;
+                case status.FALLING:
+                    // When falling to the abyss, android will be pulled down
+                    // however gravity sees fit. No user input will be read.
+                    this.animFall.update(deltaFrames);
+                    this.applyVerticalMovement(deltaFrames, config.gravity);
+                    break;
+                default:
+                    console.error("Unknown android status", this.staus);
+                    break;
+            }
+        }
+
+        applyHorizontalMovement(deltaFrames) {
+            // Read horizontal input, only takes effect if the android is not about to die.
+            this.velocity.x = input.horizontalAxis() * config.moveVelocity;
+            this.x = this.clampX(this.x + this.velocity.x * deltaFrames);
+
+            // Flip the sprite based on velocity.x. If there isn't any input, the flip
+            // variable should be left as is.
+            if (this.velocity.x < 0) {
+                this.flip = true;
+            } else if (this.velocity.x > 0) {
+                this.flip = false;
+            }
+        }
+
+        applyVerticalMovement(deltaFrames, gravity, maxFallingVelocity) {
+            let nextVelocity = this.velocity.y;
+            if (gravity) {
+                // Gravity taking effect.
+                nextVelocity += gravity * deltaFrames;
+                if (maxFallingVelocity && this.velocity.y > maxFallingVelocity) {
+                    nextVelocity = maxFallingVelocity;
                 }
             }
-
-            // Update X position based on user input.
-            if (this.falling) {
-                this.animFall.update(deltaFrames);
-            } else if (this.hurting) {
-                this.animHurt.update(deltaFrames);
-            } else {
-                // Horizontal input, only takes effect if the android is not about to die.
-                this.velocity.x = input.horizontalAxis() * config.moveVelocity;
-                this.x = this.clampX(this.x + this.velocity.x * deltaFrames);
-
-                // Flip the sprite based on velocity.x. If there isn't any input, the flip
-                // variable should be left as is.
-                if (this.velocity.x < 0) {
-                    this.flip = true;
-                } else if (this.velocity.x > 0) {
-                    this.flip = false;
-                }
-
-                // If android is not about to die, update() receives a cheat command to
-                // perform any mid-air jump. To disable this debug feature, modify
-                // enableCheats to false.
-                if (enableCheats && input.onKey(cheatKey)) {
-                    this.jump();
-                }
-            }
+            // Update altitude and Y position in canvas.
+            this.altitude -= (this.velocity.y + nextVelocity) / 2 * deltaFrames;
+            this.maxAltitude = Math.max(this.maxAltitude, this.altitude);
+            this.leadCamera();
+            // Update velocity.y.
+            this.velocity.y = nextVelocity;
         }
 
         // Predict next position of android.
@@ -199,7 +238,10 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         predict(deltaFrames) {
             const nextVelocity = {
                 x: this.velocity.x,
-                y: this.velocity.y + config.gravity * deltaFrames,
+                y: Math.min(
+                    config.maxFallingVelocity,
+                    this.velocity.y + config.gravity * deltaFrames,
+                ),
             };
             const currentCenterPosition = this.getRealCenterPosition();
             const currentPosition = {
@@ -208,11 +250,9 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
             };
             const nextPosition = {
                 x: currentPosition.x + nextVelocity.x * deltaFrames,
-                y: currentPosition.y + nextVelocity.y * deltaFrames,
+                y: currentPosition.y + (this.velocity.y + nextVelocity.y) / 2 *
+                    deltaFrames,
             };
-            if (!this.bindOverwriteNextAltitude) {
-                this.bindOverwriteNextAltitude = this.overwriteNextAltitude.bind(this);
-            }
             return {
                 ...nextPosition,
                 altitude: -nextPosition.y,
@@ -232,16 +272,21 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         }
 
         draw(ctx) {
-            if (this.powering) {
-                this.animPower.drawClip(ctx);
-            } else if (this.falling) {
-                this.animFall.drawClip(ctx);
-            } else if (this.hurting) {
-                this.animHurt.drawClip(ctx);
-            } else if (this.flip) {
-                super.draw(ctx, this.flippedImg);
-            } else {
-                super.draw(ctx);
+            switch (this.staus) {
+                case status.DEFAULT:
+                    super.draw(ctx, this.flip ? sprite.srcFlip : sprite.src);
+                    break;
+                case status.POWERING:
+                    this.animPower.drawClip(ctx);
+                    break;
+                case status.HURTING:
+                    this.animHurt.drawClip(ctx);
+                    break;
+                case status.FALLING:
+                    this.animFall.drawClip(ctx);
+                    break;
+                default:
+                    break;
             }
 
             // this.drawDebugAltitude(ctx);

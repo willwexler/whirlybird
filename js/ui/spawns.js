@@ -24,7 +24,10 @@ define(["ui/pool", "util/config"], function (pool, config) {
     }
 
     return {
-        update: function (deltaFrames, frames) {
+        // Param rhythm is used to synchronize some of the animations so
+        // they don't seem off the beat. It can be passed in as frames
+        // elapsed since game start.
+        update: function (deltaFrames, rhythm) {
             while (stairs[stairs.length - 1].hasEntered()) {
                 add();
             }
@@ -32,7 +35,7 @@ define(["ui/pool", "util/config"], function (pool, config) {
                 stairs.shift().disable();
             }
             for (const stair of stairs) {
-                stair.update(deltaFrames, frames);
+                stair.update(deltaFrames, rhythm);
             }
         },
 

@@ -43,7 +43,7 @@ define(function () {
     const touchEvents = (function () {
         // Radius of wheel, used to determine the level of input horizontal/vertical
         // axis (decimal between -1 and 1).
-        const wheelRadius = Math.round(window.innerWidth * 0.2);
+        const wheelRadius = Math.round(window.innerWidth * 0.16);
 
         // Set the position of wheel when touch starts.
         let wheel = null;

@@ -78,7 +78,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
                 ctx.font = `${fontSize}px Arial`;
                 ctx.textBaseline = "bottom";
                 ctx.textAlign = "left";
-                ctx.clearRect(0, 0, config.width, paddingTop + 5);
+                ctx.clearRect(0, 0, config.width, paddingTop + config.relativePixel(5));
                 ctx.fillText(
                     `Score: ${Math.floor(score)}    Best: ${Math.floor(bestScore)}`,
                     paddingLeft, paddingTop
@@ -111,63 +111,74 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         };
     })();
 
+    // Workspace manages canvas and its context.
+    const workspace = (function () {
+        const exports = {x: 0, y: 0, canvas: null, context: null};
+
+        function centerContainer() {
+            exports.x = (window.innerWidth - config.width) / 2;
+            exports.y = (window.innerHeight - config.height) / 2;
+            exports.container.style.width = config.width + "px";
+            exports.container.style.height = config.height + "px";
+            exports.container.style.marginLeft = exports.x + "px";
+            exports.container.style.marginTop = exports.y + "px";
+            exports.container.style.borderRadius = config.relativePixel(
+                config.wholeScreen ? 0 : 16) + "px";
+        }
+
+        function enableRetinaDisplay() {
+            exports.canvas.style.width = config.width + "px";
+            exports.canvas.style.height = config.height + "px";
+            exports.canvas.width = config.width * devicePixelRatio;
+            exports.canvas.height = config.height * devicePixelRatio;
+            exports.context.scale(devicePixelRatio, devicePixelRatio);
+            // This is a pixel game. Sprites should have clean and sharp edges.
+            exports.context.imageSmoothingEnabled = false;
+        }
+
+        exports.setup = function (container) {
+            this.container = container;
+            this.canvas = document.createElement("canvas");
+            this.canvas.width = config.width;
+            this.canvas.height = config.height;
+            this.context = this.canvas.getContext("2d");
+            this.container.appendChild(this.canvas);
+
+            centerContainer();
+            enableRetinaDisplay();
+
+            config.registerResizeEvent(function () {
+                centerContainer();
+                enableRetinaDisplay();
+            });
+        };
+
+        return exports;
+    })();
+
+    const pages = {
+        HOME: "home",
+        GAME: "game",
+        GAME_OVER: "over",
+    };
+
     return class Game {
         constructor(container) {
-            this.container = container;
-            this.init();
+            this.init(container);
             this.start();
             // this.restart();
         }
 
-        init() {
-            this.canvas = this.createCanvas(this.container);
-            this.context = this.canvas.getContext("2d");
-            this.centerContainer();
-            this.enableHighResolutionDisplay();
-
+        init(container) {
+            this.page = pages.HOME;
             this.frames = 0;
             this.gameOverAt = 0;
             this.score = 0;
             this.bestScore = bestScore.retrieve();
 
-            window.addEventListener("resize", this.onResizeWindow.bind(this));
-            this.canvas.addEventListener("click", this.onClickEvent.bind(this));
-            this.canvas.addEventListener("touchstart", this.onTouchEvent.bind(this));
-        }
-
-        createCanvas(container) {
-            const canvas = document.createElement("canvas");
-            canvas.width = config.width;
-            canvas.height = config.height;
-            container.appendChild(canvas);
-            return canvas;
-        }
-
-        centerContainer() {
-            this.container.style.width = config.width + "px";
-            this.container.style.height = config.height + "px";
-            this.x = (window.innerWidth - config.width) / 2;
-            this.y = (window.innerHeight - config.height) / 2;
-            this.container.style.marginLeft = this.x + "px";
-            this.container.style.marginTop = this.y + "px";
-        }
-
-        enableHighResolutionDisplay() {
-            this.canvas.style.width = config.width + "px";
-            this.canvas.style.height = config.height + "px";
-            this.canvas.width = config.width * devicePixelRatio;
-            this.canvas.height = config.height * devicePixelRatio;
-            this.context.scale(devicePixelRatio, devicePixelRatio);
-            // This is a pixel game. Sprites should have clean and sharp edges.
-            this.context.imageSmoothingEnabled = false;
-        }
-
-        // Listens to resize event.
-        // Center the canvas container and notify relevant parties of this change.
-        onResizeWindow() {
-            config.updateOnResize();
-            this.centerContainer();
-            this.enableHighResolutionDisplay();
+            workspace.setup(container);
+            workspace.canvas.addEventListener("click", this.onClickEvent.bind(this));
+            workspace.canvas.addEventListener("touchstart", this.onTouchEvent.bind(this));
         }
 
         // Listens to click event.
@@ -183,13 +194,13 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         }
 
         onClick(e) {
-            if (e.target !== this.canvas) {
+            if (e.target !== workspace.canvas) {
                 return;
             }
             const where = {x: e.clientX, y: e.clientY};
-            where.x -= this.x;
-            where.y -= this.y;
-            if (this.isGameOver() && panel.isClickingRestart(where)) {
+            where.x -= workspace.x;
+            where.y -= workspace.y;
+            if (this.page !== pages.GAME && panel.isClickingRestart(where)) {
                 this.restart();
             }
             titleBar.onClick(where);
@@ -212,6 +223,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
 
         // Resets everything and restart the game.
         restart() {
+            this.page = pages.GAME;
             this.frames = 0;
             this.gameOverAt = Infinity;
             this.score = 0;
@@ -225,14 +237,28 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             const deltaFrames = config.elapsedFrames();
             this.frames += deltaFrames;
 
-            if (this.isGameOver()) {
-                panel.update(deltaFrames);
-                if (input.onSpace()) {
-                    this.restart();
-                }
-                return;
+            switch (this.page) {
+                case pages.GAME:
+                    if (this.isGameOver()) {
+                        this.page = pages.GAME_OVER;
+                    } else {
+                        this.updateGame(deltaFrames);
+                    }
+                    break;
+                case pages.HOME:
+                // fallthrough
+                case pages.GAME_OVER:
+                    panel.update(deltaFrames);
+                    if (input.onSpace()) {
+                        this.restart();
+                    }
+                    break;
+                default:
+                    break;
             }
+        }
 
+        updateGame(deltaFrames) {
             android.update(deltaFrames);
             platforms.update(deltaFrames, this.frames);
             ribbon.update();
@@ -272,18 +298,26 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
 
         // Render UI at every frame.
         render() {
-            this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            workspace.context.clearRect(0, 0, config.width, config.height);
 
-            if (!this.gameOverAt) { // first
-                panel.draw(this.context, "START GAME");
-            } else if (this.isGameOver()) {
-                panel.draw(this.context, "GAME OVER");
-            } else {
-                android.draw(this.context);
-                platforms.draw(this.context);
-                ribbon.draw(this.context);
+            switch (this.page) {
+                case pages.HOME:
+                    panel.draw(workspace.context, "START GAME");
+                    break;
+                case pages.GAME:
+                    android.draw(workspace.context);
+                    platforms.draw(workspace.context);
+                    ribbon.draw(workspace.context);
+                    break;
+                case pages.GAME_OVER:
+                    panel.draw(workspace.context, "GAME OVER");
+                    break;
+                default:
+                    break;
             }
-            titleBar.draw(this.context, this.score, this.bestScore);
+
+            // Title bar overlaps top area of the canvas, thus should draw at last.
+            titleBar.draw(workspace.context, this.score, this.bestScore);
         }
 
         // showGameOver puts current frame to the GameOver frame (arg: gameOverAt),

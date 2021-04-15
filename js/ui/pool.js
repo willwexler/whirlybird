@@ -6,13 +6,13 @@ define(["ui/stair", "util/config"], function (stair, config) {
     const platformPool = (function () {
         this.pool = {};
 
-        for (const it of sprites) {
-            this.pool[it.src] = [];
+        for (const it of sprites.types) {
+            this.pool[it] = [];
         }
 
         return {
-            retrieve: (sprite, altitude) => {
-                const cached = this.pool[sprite.src];
+            retrieve: (type, altitude) => {
+                const cached = this.pool[type];
                 // find recyclable
                 for (const it of cached) {
                     if (!it.active) {
@@ -21,7 +21,7 @@ define(["ui/stair", "util/config"], function (stair, config) {
                     }
                 }
                 // append the pool
-                const append = sprite.instantiate(altitude);
+                const append = sprites[type].instantiate(altitude);
                 cached.push(append);
                 // console.log("pool appended", sprite.src, cached.length);
                 return append;
@@ -43,7 +43,9 @@ define(["ui/stair", "util/config"], function (stair, config) {
 
         let stairCount = 0;
 
-        function stairAcceptable(next) {
+        function stairAcceptable(type) {
+            const next = sprites[type];
+
             // Platforms of the first page should be simple.
             if (stairCount < startUpBonus && !next.starter) {
                 return false;
@@ -82,15 +84,11 @@ define(["ui/stair", "util/config"], function (stair, config) {
             return true;
         }
 
-        function randomStair() {
-            return sprites[Math.floor(Math.random() * sprites.length)];
-        }
-
         return {
             get: function () {
                 let next;
                 do {
-                    next = randomStair();
+                    next = sprites.randomType();
                 } while (!stairAcceptable(next))
                 ++stairCount;
                 return next;

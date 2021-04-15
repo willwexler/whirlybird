@@ -79,14 +79,14 @@ define(["ui/sprite", "util/config"], function (Sprite, config) {
         that = sprites.restart;
         it.x = (config.width - groupWidth) / 2;
         it.y = that.y - gapVertical3 - it.h;
-        it.setAnimation(spritesConfig.egOk.animSrc, animClipDuration, true);
+        it.setAnimation(spritesConfig.egOk.animSrc, animClipDuration).loop();
 
         // setup egCaution
         it = sprites.egCaution;
         that = sprites.egOk;
         it.x = that.x + that.w + gapHorizontal;
         it.y = that.y;
-        it.setAnimation(spritesConfig.egCaution.animSrc, animClipDuration, true);
+        it.setAnimation(spritesConfig.egCaution.animSrc, animClipDuration).loop();
 
         // setup icOk
         it = sprites.icOk;

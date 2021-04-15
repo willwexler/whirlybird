@@ -13,9 +13,9 @@ define(function () {
             powerUpDuration: 99,
             // The chance of the powerUp props appear on the platform.
             powerUpChance: 0.15,
-            // Duration frames of one PowerUp joggle.
+            // Duration frames of one PowerUp joggle animation.
             powerUpJoggleDuration: 12,
-            // Duration frames of one slime joggle.
+            // Duration frames of one slime joggle animation.
             slimeJoggleDuration: 12,
             // How many frames should camera shake when android is hurt.
             quakeDuration: 22,
@@ -24,14 +24,14 @@ define(function () {
         resizable: {
             // The preferred size of the canvas.
             width: 600,
-            height: 1140,
+            height: 1160,
 
             // Physics variables involving the android.
-            gravity: 0.5,
+            gravity: 0.52,
             moveVelocity: 10,
             jumpVelocity: -22,
-            bounceVelocity: -40,
-            powerUpVelocity: -40,
+            bounceVelocity: -39,
+            powerUpVelocity: -39,
             maxFallingVelocity: 14,
 
             // Horizontal padding to the canvas of the spawned platforms.
@@ -42,9 +42,9 @@ define(function () {
             // of them.
             platformMoveSpeed: 1.5,
             // Range of PowerUp prop's vertical joggle.
-            powerUpJoggleDistance: 2,
+            powerUpJoggleDistance: 4,
             // Range of slime's joggle.
-            slimeJoggleDistance: 3,
+            slimeJoggleDistance: 5,
             // Falling logic will be triggered if the android's position is
             // fallingThreshold lower than every platform.
             fallingThreshold: 100,
@@ -52,8 +52,12 @@ define(function () {
             quakeDeltaX: 2,
             quakeDeltaY: 4,
         },
-        // Those fields should always be a integer.
+        // Those fields in resizable should always be a integer.
         int: ["width", "height", "platformPadding", "platformGap", "fallingThreshold"],
+        // Aspect ratio for mobiles varies. These are minimum and maximum values
+        // for the sake of playability.
+        minAspectRatio: 1040 / 600,
+        maxAspectRatio: 1160 / 600,
         // Ratio as to the default values.
         ratio: 1,
         // Arrays of functions to call when there's been a resize event.
@@ -147,12 +151,6 @@ define(function () {
             return 1;
         }
 
-        // const timeElapsed = now - fps.update.then;
-        // if (now - fps.update.last >= fps.update.interval) {
-        //     fps.update.last = now;
-        //     exports.fps = Math.round(fps.second / timeElapsed);
-        // }
-
         let timeElapsed = now - fps.update.last;
         ++fps.update.count;
         if (timeElapsed >= fps.update.interval) {
@@ -188,46 +186,71 @@ define(function () {
     };
 
     // Recalculate physics variables when resize.
-    exports.updateOnResize = function () {
-        console.log(`window size = (${window.innerWidth}, ${window.innerHeight})`);
+    window.addEventListener("resize", (function () {
+        settings.updateRatio = function (ratio) {
+            // Update all resizable values based on ratio.
+            this.ratio = ratio;
+            for (const [key, value] of Object.entries(this.resizable)) {
+                exports[key] = value * ratio;
+            }
+            for (const key of this.int) {
+                exports[key] = Math.round(exports[key]);
+            }
+        };
 
-        const isMobile = checkMobile();
+        function measure4Mobile() {
+            let aspectRatio = window.innerHeight / window.innerWidth;
+            if (aspectRatio < settings.minAspectRatio) {
+                aspectRatio = settings.minAspectRatio;
+            } else if (aspectRatio > settings.maxAspectRatio) {
+                aspectRatio = settings.maxAspectRatio;
+            }
+            const referringWidth = settings.resizable.width;
+            const referringHeight = referringWidth * aspectRatio;
 
-        let padding = window.innerHeight < 1100 ? 10 : 74;
-        if (isMobile) {
-            padding = 0;
-        }
-        const ratioVertical = (window.innerHeight - padding) / settings.resizable.height;
-        const ratioHorizontal = window.innerWidth / settings.resizable.width;
+            settings.updateRatio(window.innerHeight / referringHeight);
 
-        if (isMobile) {
-            // For playability, ratio for mobiles should always be vertical.
-            settings.ratio = ratioVertical;
-        } else {
-            settings.ratio = Math.min(ratioVertical, ratioHorizontal);
-        }
-
-        for (const [key, value] of Object.entries(settings.resizable)) {
-            exports[key] = value * settings.ratio;
-        }
-        for (const key of settings.int) {
-            exports[key] = Math.round(exports[key]);
-        }
-
-        // For mobile users, canvas should fit to the whole screen.
-        if (isMobile) {
-            exports.width = window.innerWidth;
+            // For mobile users, canvas should fit to the whole screen.
+            if (window.innerWidth < window.innerHeight) {
+                // Only expand the width when in portrait mode.
+                exports.width = window.innerWidth;
+                exports.wholeScreen = true;
+            }
             exports.height = window.innerHeight;
-            exports.moveVelocity = ratioHorizontal * settings.resizable.moveVelocity;
+            exports.moveVelocity = settings.resizable.moveVelocity *
+                (exports.width / referringWidth);
         }
 
-        // Notify relevant parties.
-        for (const fn of settings.resizer) {
-            fn();
-        }
-    };
+        function measure4Desktop() {
+            const padding = window.innerHeight < 1100 ? 10 : 54;
+            const ratioVertical = (window.innerHeight - padding) / settings.resizable.height;
+            const ratioHorizontal = window.innerWidth / settings.resizable.width;
 
-    exports.updateOnResize();
+            settings.updateRatio(Math.min(ratioVertical, ratioHorizontal));
+        }
+
+        function resize() {
+            exports.wholeScreen = false;
+
+            if (checkMobile()) {
+                measure4Mobile();
+            } else {
+                measure4Desktop();
+            }
+
+            // Notify relevant parties.
+            for (const fn of settings.resizer) {
+                fn();
+            }
+
+            console.log(`Window: (${window.innerWidth}, ${window.innerHeight}), ` +
+                `Canvas: (${exports.width}, ${exports.height}), ` +
+                `Ratio: ${settings.ratio.toFixed(4)}`);
+        }
+
+        resize();
+        return resize;
+    })());
 
     return exports;
 });

@@ -6,159 +6,143 @@ define(["util/config"], function (config) {
     // Setup positions and dimensions of the sprites.
     const sheetConfig = (function () {
         const sheet = {};
+        const spacing = 1; // avoids edge bleeding
         let key, x, y, w, h;
 
-        x = 0;
-        y = 0;
-        w = 48;
-        h = 53;
+        [x, y, w, h] = [0, 0, 48, 53];
         key = "android";
         sheet[key] = {x, y, w, h};
-        x += w;
+        x += w + spacing;
 
         key = "android-flip";
         sheet[key] = {x, y, w, h};
-        x += w;
+        x += w + spacing;
+
+        key = "android-power-up-flip-";
+        for (let i = 1; i <= 3; ++i) {
+            sheet[key + i] = {x, y, w, h};
+            x += w + spacing;
+        }
 
         key = "android-power-up-";
         for (let i = 1; i <= 3; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
         key = "android-fall-";
         for (let i = 1; i <= 2; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
         key = "android-hurt-";
         for (let i = 1; i <= 8; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
-        x = 0;
-        y = h;
-        w = 60;
-        h = 92;
+        [x, y, w, h] = [0, 54, 60, 92];
         key = "eg-caution-";
         for (let i = 1; i <= 11; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
+        [w, h] = [60, 53];
         key = "btn-restart";
-        w = 60;
-        h = 53;
         sheet[key] = {x, y, w, h};
-        x += w;
+        x += w + spacing;
 
-        key = "ic-ok";
         w = h = 20;
+        key = "ic-ok";
         sheet[key] = {x, y, w, h};
-        x += w;
+        x += w + spacing;
 
         key = "ic-caution";
         sheet[key] = {x, y, w, h};
 
-        x = 660;
-        y = 106;
-        w = h = 39;
+        [x, y, w, h] = [0, 147, 60, 92];
+        key = "eg-ok-";
+        for (let i = 1; i <= 7; ++i) {
+            sheet[key + i] = {x, y, w, h};
+            x += w + spacing;
+        }
+
+        [w, h] = [49, 20];
+        key = "stair-default";
+        sheet[key] = {x, y, w, h};
+        x += w + spacing;
+
+        w = 47;
+        key = "stair-stealth";
+        sheet[key] = {x, y, w, h};
+        x += w + spacing;
+
+        key = "stair-moving-";
+        for (let i = 1; i <= 2; ++i) {
+            sheet[key + i] = {x, y, w, h};
+            x += w + spacing;
+        }
+
+        w = 35;
+        key = "power-up-";
+        for (let i = 1; i <= 3; ++i) {
+            sheet[key + i] = {x, y, w, h};
+            x += w + spacing;
+        }
+
+        [y, w, h] = [128, 39, 39];
         key = "stair-slime-";
         for (let i = 1; i <= 3; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
         key = "stair-slime";
         sheet[key] = {x, y, w, h};
 
-        x = 0;
-        y = 145;
-        w = 60;
-        h = 92;
-        key = "eg-ok-";
-        for (let i = 1; i <= 7; ++i) {
-            sheet[key + i] = {x, y, w, h};
-            x += w;
-        }
-
-        key = "stair-default";
-        w = 49;
-        h = 20;
-        sheet[key] = {x, y, w, h};
-        x += w;
-
-        key = "stair-stealth";
-        w = 47;
-        sheet[key] = {x, y, w, h};
-        x += w;
-
-        key = "stair-moving-";
-        for (let i = 1; i <= 2; ++i) {
-            sheet[key + i] = {x, y, w, h};
-            x += w;
-        }
-
-        key = "power-up-";
-        w = 35;
-        for (let i = 1; i <= 3; ++i) {
-            sheet[key + i] = {x, y, w, h};
-            x += w;
-        }
-
-        x = 420;
-        y = 165;
-        w = 49;
-        h = 19;
+        [x, y, w, h] = [427, 168, 49, 19];
         key = "stair-cloud";
         sheet[key] = {x, y, w, h};
-        x += w;
+        x += w + spacing;
 
         key = "stair-cloud-collapse-";
         for (let i = 1; i <= 6; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
-        x = 420;
-        y += h;
-        w = 42;
-        h = 21;
-        key = "stair-spring";
-        sheet[key] = {x, y, w, h};
-        x += w;
-
-        key = "stair-spring-bounce-";
+        [x, y, w, h] = [427, 188, 45, 29];
+        key = "stair-thorn-";
         for (let i = 1; i <= 4; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
-        key = "stair-thorn";
-        w = 47;
-        h = 29;
-        sheet[key] = {x, y, w, h};
-
-        x = 420;
-        y = 205;
-        w = 47;
-        h = 27;
+        [w, h] = [47, 27];
         key = "stair-fragile";
         sheet[key] = {x, y, w, h};
-        x += w;
+        x += w + spacing;
 
         key = "stair-fragile-collapse-";
         for (let i = 1; i <= 3; ++i) {
             sheet[key + i] = {x, y, w, h};
-            x += w;
+            x += w + spacing;
         }
 
-        x = 0;
-        y = 237;
-        w = 600;
-        h = 2;
+        [x, y, w, h] = [427, 218, 42, 21];
+        key = "stair-spring";
+        sheet[key] = {x, y, w, h};
+        x += w + spacing;
+
+        key = "stair-spring-bounce-";
+        for (let i = 1; i <= 4; ++i) {
+            sheet[key + i] = {x, y, w, h};
+            x += w + spacing;
+        }
+
+        [x, y, w, h] = [0, 240, 600, 2];
         key = "ribbon";
         sheet[key] = {x, y, w, h};
 
@@ -188,12 +172,8 @@ define(["util/config"], function (config) {
             console.error("Sprite sheet does not contain " + src);
             return;
         }
-        // ctx.drawImage(this.img, conf.x, conf.y, conf.w, conf.h,
-        //     sprite.x, sprite.y, sprite.w, sprite.h);
         ctx.drawImage(this.img, conf.x, conf.y, conf.w, conf.h,
-            Math.round(sprite.x), Math.round(sprite.y),
-            Math.round(sprite.w), Math.round(sprite.h),
-        );
+            sprite.x, sprite.y, sprite.w, sprite.h);
     };
 
     // Load sprite images separately (only when pack=false).
@@ -230,10 +210,8 @@ define(["util/config"], function (config) {
     });
 
     class Animation {
-        constructor(parent, images, clipDuration, loop, stays) {
+        constructor(parent, images, clipDuration) {
             this.parent = parent;
-            this.loop = loop;
-            this.stays = stays;
             this.init(images, clipDuration);
         }
 
@@ -247,14 +225,39 @@ define(["util/config"], function (config) {
             this.animIndex = 0;
             this.animClipDuration = clipDuration;
             this.animDuration = clipDuration * src.length;
+            this.animLoop = false;
+            this.animStayAfterFinish = false;
         }
 
-        // Param loop specifies if the animation should loop in endless cycles,
-        // Param stays specifies the behavior once animation has ended, if stays
-        // equals to true, drawClip() shall draw the last frame of the animation,
-        // otherwise it draws nothing after finished.
-        update(deltaFrames) {
-            if (this.loop) {
+        setSource(src) {
+            this.animSrc = src;
+            return this;
+        }
+
+        // Animation shall loop in an endless cycle.
+        loop(delay) {
+            this.animLoop = true;
+            if (delay) {
+                this.animDuration += delay;
+            }
+            return this;
+        }
+
+        // This changes the behavior after animation ends. drawClip() shall
+        // draw the last frame of the animation, by default it draws nothing
+        // after finished.
+        stayAfterFinish() {
+            this.animStayAfterFinish = true;
+            return this;
+        }
+
+        // When it's a loop animation, rhythm can be used to synchronize
+        // animations of the same kind.
+        update(deltaFrames, rhythm) {
+            if (this.animLoop) {
+                if (rhythm) {
+                    this.animFrames = rhythm;
+                }
                 this.animFrames %= this.animDuration;
             }
 
@@ -265,7 +268,11 @@ define(["util/config"], function (config) {
                 }
             }
             if (i >= this.animSrc.length) {
-                i = this.stays ? this.animSrc.length - 1 : -1;
+                if (this.animLoop || this.animStayAfterFinish) {
+                    i = this.animSrc.length - 1;
+                } else {
+                    i = -1;
+                }
             }
             this.animIndex = i;
             this.animFrames += deltaFrames;
@@ -297,13 +304,13 @@ define(["util/config"], function (config) {
             }
         }
 
-        setAnimation(images, clipDuration, loop = true, stays = true) {
-            this.anim = this.newAnimation(images, clipDuration, loop, stays);
+        setAnimation(images, clipDuration) {
+            this.anim = this.newAnimation(images, clipDuration);
             return this.anim;
         }
 
-        newAnimation(images, clipDuration, loop = true, stays = true) {
-            return new Animation(this, images, clipDuration, loop, stays);
+        newAnimation(images, clipDuration) {
+            return new Animation(this, images, clipDuration);
         }
 
         draw(ctx, image = this.src) {

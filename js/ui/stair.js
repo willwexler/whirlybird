@@ -1,22 +1,24 @@
 define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, camera) {
-    const sprites = [
-        {
+    const sprites = {
+        default: {
             src: "stair-default",
             stable: true,
             starter: true,
+            upgradable: true,
             instantiate: function (altitude) {
                 return new StairDefault(altitude);
             }
         },
-        {
+        stealth: {
             src: "stair-stealth",
             stable: true,
             starter: false,
+            upgradable: false,
             instantiate: function (altitude) {
                 return new StairStealth(altitude);
             }
         },
-        {
+        fragile: {
             src: "stair-fragile",
             animSrc: [
                 "stair-fragile-collapse-1",
@@ -25,11 +27,12 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             ],
             stable: true,
             starter: true,
+            upgradable: false,
             instantiate: function (altitude) {
                 return new StairFragile(altitude);
             }
         },
-        {
+        moving: {
             src: "stair-moving-1",
             animSrc: [
                 "stair-moving-1",
@@ -37,11 +40,12 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             ],
             stable: true,
             starter: false,
+            upgradable: true,
             instantiate: function (altitude) {
                 return new StairMoving(altitude);
             }
         },
-        {
+        cloud: {
             src: "stair-cloud",
             animSrc: [
                 "stair-cloud-collapse-1",
@@ -53,19 +57,28 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             ],
             stable: false,
             starter: true,
+            upgradable: false,
             instantiate: function (altitude) {
                 return new StairCloud(altitude);
             }
         },
-        {
-            src: "stair-thorn",
+        thorn: {
+            src: "stair-thorn-1",
+            animSrc: [
+                "stair-thorn-1",
+                "stair-thorn-2",
+                "stair-thorn-3",
+                "stair-thorn-4",
+                "stair-thorn-1",
+            ],
             stable: false,
             starter: false,
+            upgradable: false,
             instantiate: function (altitude) {
                 return new StairThorn(altitude);
             }
         },
-        {
+        spring: {
             src: "stair-spring",
             animSrc: [
                 "stair-spring-bounce-1",
@@ -75,11 +88,12 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             ],
             stable: true,
             starter: false,
+            upgradable: false,
             instantiate: function (altitude) {
                 return new StairSpring(altitude);
             }
         },
-        {
+        slime: {
             src: "stair-slime",
             animSrc: [
                 "stair-slime-1",
@@ -89,11 +103,12 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             ],
             stable: false,
             starter: false,
+            upgradable: false,
             instantiate: function (altitude) {
                 return new StairSlime(altitude);
             }
-        }
-    ];
+        },
+    };
     const powerUps = {
         src: ["power-up-1"],
         animSrc: [
@@ -102,6 +117,11 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             "power-up-3",
         ],
         lucky: () => false,
+    };
+
+    sprites.types = Object.keys(sprites);
+    sprites.randomType = function () {
+        return sprites.types[Math.floor(sprites.types.length * Math.random())];
     };
 
     // Randomize the X position of the platforms.
@@ -158,49 +178,32 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         };
     })();
 
-    class Joggle {
-        constructor(duration) {
-            this.duration = duration;
-            this.direction = 1;
-            this.frameTimer = 0;
+    const joggleDelta = function (duration, distance, rhythm) {
+        const mod = rhythm % (2 * duration);
+        let k;
+        if (mod < duration) {
+            k = rhythm % duration / duration;
+        } else {
+            k = 1 - rhythm % duration / duration;
         }
-
-        reset() {
-            this.direction = 1;
-            this.frameTimer = 0;
-        }
-
-        deltaDistance(deltaFrames, joggleDistance) {
-            this.frameTimer += deltaFrames;
-            if (this.frameTimer > this.duration) {
-                this.direction = -this.direction;
-            }
-            this.frameTimer %= this.duration;
-            return this.direction * joggleDistance *
-                (this.frameTimer / this.duration);
-        }
-    }
+        return k * distance;
+    };
 
     class PowerUp extends Sprite {
         constructor() {
             super(powerUps.src);
-            super.setAnimation(powerUps.animSrc, 6, true);
-            this.joggle = new Joggle(config.powerUpJoggleDuration);
+            super.setAnimation(powerUps.animSrc, 6).loop();
             this.deltaY = 0;
             this.enabled = false;
         }
 
-        reset() {
-            this.joggle.reset();
-        }
-
-        update(deltaFrames) {
+        update(deltaFrames, rhythm) {
             if (!this.enabled) {
                 return;
             }
-            this.anim.update(deltaFrames);
-            this.deltaY = this.joggle.deltaDistance(deltaFrames,
-                config.powerUpJoggleDistance);
+            this.anim.update(deltaFrames, rhythm);
+            this.deltaY = joggleDelta(config.powerUpJoggleDuration,
+                config.powerUpJoggleDistance, rhythm);
         }
 
         draw(ctx, x, y) {
@@ -214,9 +217,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     }
 
     class Stair extends Sprite {
-        constructor(sprite, altitude, prop) {
+        constructor(sprite, altitude) {
             super(sprite.src);
-            if (prop) {
+            if (sprite.upgradable) {
                 this.powerup = new PowerUp();
             }
             this.setup(altitude);
@@ -231,7 +234,6 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.altitude = altitude;
             this.requestCameraAttention();
             if (this.powerup) {
-                this.powerup.reset();
                 this.powerup.enabled = powerUps.lucky();
             }
             this.previousPositions = null;
@@ -363,10 +365,10 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.y = p.y;
         }
 
-        update(deltaFrames) {
+        update(deltaFrames, rhythm) {
             this.requestCameraAttention();
             if (this.powerup && this.powerup.enabled) {
-                this.powerup.update(deltaFrames);
+                this.powerup.update(deltaFrames, rhythm);
             }
             if (this.moveSpeed) {
                 this.x += this.moveSpeed * deltaFrames;
@@ -394,7 +396,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
         drawPowerUp(ctx) {
             if (this.powerup && this.powerup.enabled) {
                 const x = (this.w - this.powerup.w) / 2 + this.x;
-                const y = this.y - this.powerup.h - config.relativePixel(10);
+                const y = this.y - this.powerup.h - config.relativePixel(12);
                 this.powerup.draw(ctx, x, y);
             }
         }
@@ -404,7 +406,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // jump on it.
     class StairDefault extends Stair {
         constructor(altitude) {
-            super(sprites[0], altitude, true);
+            super(sprites.default, altitude);
         }
     }
 
@@ -412,7 +414,7 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // continuously. It's safe to step on.
     class StairStealth extends Stair {
         constructor(altitude) {
-            super(sprites[1], altitude);
+            super(sprites.stealth, altitude);
             this.animDuration = 20;
             this.animFrames = 0;
             this.blinkInterval = 80;
@@ -429,9 +431,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.visible = false;
         }
 
-        update(deltaFrames, frames) {
-            super.update(deltaFrames);
-            const mod = Math.round(frames) % this.blinkInterval;
+        update(deltaFrames, rhythm) {
+            super.update(deltaFrames, rhythm);
+            const mod = Math.round(rhythm) % this.blinkInterval;
             if (mod >= 0 && mod < this.blinkInterval / 2 && !this.visible) {
                 this.easeIn = true;
                 this.animFrames = 0;
@@ -483,9 +485,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // collapses to dust.
     class StairFragile extends Stair {
         constructor(altitude) {
-            super(sprites[2], altitude);
+            super(sprites.fragile, altitude);
             this.collapse = false;
-            super.setAnimation(sprites[2].animSrc, 5, false, false);
+            super.setAnimation(sprites.fragile.animSrc, 5);
         }
 
         reset(altitude) {
@@ -505,8 +507,8 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return flag;
         }
 
-        update(deltaFrames) {
-            super.update(deltaFrames);
+        update(deltaFrames, rhythm) {
+            super.update(deltaFrames, rhythm);
             if (this.collapse) {
                 this.anim.update(deltaFrames);
             }
@@ -524,8 +526,8 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // This platform moves horizontally at a certain speed. It's safe to step on.
     class StairMoving extends Stair {
         constructor(altitude) {
-            super(sprites[3], altitude, true);
-            super.setAnimation(sprites[3].animSrc, 6, true);
+            super(sprites.moving, altitude);
+            super.setAnimation(sprites.moving.animSrc, 6).loop();
             super.startPatrol(config.platformMoveSpeed);
         }
 
@@ -534,9 +536,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             super.startPatrol(config.platformMoveSpeed);
         }
 
-        update(deltaFrames) {
-            super.update(deltaFrames);
-            this.anim.update(deltaFrames);
+        update(deltaFrames, rhythm) {
+            super.update(deltaFrames, rhythm);
+            this.anim.update(deltaFrames, rhythm);
         }
 
         draw(ctx) {
@@ -550,9 +552,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // the cloud falls apart.
     class StairCloud extends Stair {
         constructor(altitude) {
-            super(sprites[4], altitude);
+            super(sprites.cloud, altitude);
             this.collapse = false;
-            super.setAnimation(sprites[4].animSrc, 4, false, false);
+            super.setAnimation(sprites.cloud.animSrc, 4);
         }
 
         reset(altitude) {
@@ -572,8 +574,8 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return config.COLLIDE_TYPE_NONE;
         }
 
-        update(deltaFrames) {
-            super.update(deltaFrames);
+        update(deltaFrames, rhythm) {
+            super.update(deltaFrames, rhythm);
             if (this.collapse) {
                 this.anim.update(deltaFrames);
             }
@@ -592,7 +594,13 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // death to anyone that falls upon it.
     class StairThorn extends Stair {
         constructor(altitude) {
-            super(sprites[5], altitude);
+            super(sprites.thorn, altitude);
+            super.setAnimation(sprites.thorn.animSrc, 6).loop(60);
+        }
+
+        reset(altitude) {
+            super.reset(altitude);
+            this.anim.reset();
         }
 
         isBeingStepped(android) {
@@ -602,14 +610,23 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             }
             return config.COLLIDE_TYPE_NONE;
         }
+
+        update(deltaFrames, rhythm) {
+            super.update(deltaFrames, rhythm);
+            this.anim.update(deltaFrames, rhythm);
+        }
+
+        draw(ctx) {
+            this.anim.drawClip(ctx);
+        }
     }
 
     // This platform has a spring on it. Androids can jump even higher on it.
     class StairSpring extends Stair {
         constructor(altitude) {
-            super(sprites[6], altitude);
+            super(sprites.spring, altitude);
             this.bounce = false;
-            super.setAnimation(sprites[6].animSrc, 2, false, true);
+            super.setAnimation(sprites.spring.animSrc, 2).stayAfterFinish();
         }
 
         reset(altitude) {
@@ -630,8 +647,8 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return config.COLLIDE_TYPE_NONE;
         }
 
-        update(deltaFrames) {
-            super.update(deltaFrames);
+        update(deltaFrames, rhythm) {
+            super.update(deltaFrames, rhythm);
             if (this.bounce) {
                 this.anim.update(deltaFrames);
             }
@@ -652,10 +669,9 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
     // whoever dares to touch it.
     class StairSlime extends Stair {
         constructor(altitude) {
-            super(sprites[7], altitude);
-            super.setAnimation(sprites[7].animSrc, 6, true);
+            super(sprites.slime, altitude);
+            super.setAnimation(sprites.slime.animSrc, 6).loop(10);
             super.startPatrol(config.platformMoveSpeed);
-            this.joggle = new Joggle(config.slimeJoggleDuration);
             this.kicked = false;
             this.velocityY = 0;
         }
@@ -666,7 +682,6 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             this.kicked = false;
             this.velocityY = 0;
             this.anim.reset();
-            this.joggle.reset();
         }
 
         isBeingStepped(android) {
@@ -690,16 +705,16 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
             return i === 1 || i === 2;
         }
 
-        update(deltaFrames) {
+        update(deltaFrames, rhythm) {
             if (this.kicked) {
                 this.velocityY += config.gravity * deltaFrames;
                 this.altitude -= this.velocityY * deltaFrames;
             }
-            super.update(deltaFrames);
+            super.update(deltaFrames, rhythm);
             if (!this.kicked) {
-                this.anim.update(deltaFrames);
-                this.y += this.joggle.deltaDistance(deltaFrames,
-                    config.slimeJoggleDistance);
+                this.anim.update(deltaFrames, rhythm);
+                this.y += joggleDelta(config.slimeJoggleDuration,
+                    config.slimeJoggleDistance, rhythm);
             }
         }
 

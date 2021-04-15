@@ -11,9 +11,13 @@ define(["ui/sprite", "util/camera", "util/config"], function (Sprite, camera, co
         }
 
         init() {
+            this.bestScore = 0;
             this.altitude = 0;
             this.w = config.width;
-            config.registerResizeEvent(() => this.w = config.width);
+            config.registerResizeEvent(() => {
+                this.w = config.width;
+                this.altitude = config.scoreToAltitude(this.bestScore);
+            });
         }
 
         setBestScore(best) {
@@ -31,11 +35,13 @@ define(["ui/sprite", "util/camera", "util/config"], function (Sprite, camera, co
         draw(ctx) {
             if (this.altitude && camera.canFitIn(this)) {
                 super.draw(ctx);
+                const padding = config.relativePixel(5);
                 ctx.font = `${config.fontSize(14)}px Arial`;
                 ctx.textBaseline = "bottom";
                 ctx.textAlign = "left";
                 ctx.fillStyle = "#555";
-                ctx.fillText("Best: " + Math.floor(this.bestScore), 5, this.y - 5);
+                ctx.fillText("Best: " + Math.floor(this.bestScore),
+                    padding, this.y - padding);
             }
         }
     }
