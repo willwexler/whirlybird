@@ -47,7 +47,7 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
     class Android extends Sprite {
         constructor() {
             super(sprite.src);
-            this.animPower = super.newAnimation(sprite.animSrc.power.src, 6).loop();
+            this.animPower = super.newAnimation(sprite.animSrc.power.src, 4).loop();
             this.animFall = super.newAnimation(sprite.animSrc.fall, 6).loop();
             this.animHurt = super.newAnimation(sprite.animSrc.hurt, 4);
             this.bindOverwriteNextAltitude = this.overwriteNextAltitude.bind(this);
@@ -70,11 +70,10 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
             this.animHurt.reset();
 
             this.staus = status.DEFAULT;
-            this.generalFrameCounter = 0;
-            this.isCameraShaking = false;
+            this.frameCounter = 0;
             this.overwriteUpdate = false;
 
-            camera.reset();
+            camera.moveTo(this.getRealCenterPosition());
         }
 
         // General behavior of android after stepped on a platform.
@@ -90,7 +89,7 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
         // Android receives a power up as luck would have it.
         // It sprints upwards meanwhile ignores gravity, until a certain amount of frames.
         powerUp() {
-            this.generalFrameCounter = 0;
+            this.frameCounter = 0;
             this.staus = status.POWERING;
             this.animPower.setSource(this.flip ?
                 sprite.animSrc.power.flip :
@@ -99,9 +98,8 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
 
         // Game over condition: hurt by thorn or slime.
         hurt() {
-            this.generalFrameCounter = 0;
-            this.isCameraShaking = true;
             this.staus = status.HURTING;
+            camera.prepareShake();
         }
 
         // Game over condition: fall off the platforms.
@@ -165,8 +163,8 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
                     // not be affected by gravity. User's horizontal input still
                     // takes effect.
                     this.velocity.y = config.powerUpVelocity;
-                    this.generalFrameCounter += deltaFrames;
-                    if (this.generalFrameCounter >= config.powerUpDuration) {
+                    this.frameCounter += deltaFrames;
+                    if (this.frameCounter >= config.powerUpDuration) {
                         this.staus = status.DEFAULT;
                     }
                     this.animPower.update(deltaFrames);
@@ -177,17 +175,8 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
                     // When android is hurting, neither gravity nor user input will
                     // be able to affect its position.
                     this.animHurt.update(deltaFrames);
-
                     // Camera shakes for a short amount of time.
-                    if (this.isCameraShaking) {
-                        this.generalFrameCounter += deltaFrames;
-                        if (this.generalFrameCounter < config.quakeDuration) {
-                            camera.quake();
-                        } else {
-                            this.isCameraShaking = false;
-                            camera.stopQuake();
-                        }
-                    }
+                    camera.shake(deltaFrames);
                     break;
                 case status.FALLING:
                     // When falling to the abyss, android will be pulled down
