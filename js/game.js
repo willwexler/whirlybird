@@ -2,21 +2,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
     "util/input"], function (android, platforms, ribbon, panel, config, input
 ) {
 
-    // Maintain/Persist best game score.
-    const bestScore = (function () {
-        const key = "best";
-        return {
-            retrieve: function () {
-                const value = localStorage.getItem(key);
-                return value ? value : 0;
-            },
-            store: function (value) {
-                localStorage.setItem(key, value);
-            }
-        };
-    })();
-
-    // Title bar, draws scores, FPS text.
+    // Title bar, draws scores and FPS text.
     const titleBar = (function () {
         const debuggable = true;
         const fpsText = {
@@ -68,8 +54,31 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         // Reset text box after resize.
         config.registerResizeEvent(() => fpsText.w = 0);
 
+        // Maintain/Persist best game score.
+        const bestScore = (function () {
+            const key = "best";
+            return {
+                retrieve: function () {
+                    const value = localStorage.getItem(key);
+                    return value ? value : 0;
+                },
+                store: function (value) {
+                    localStorage.setItem(key, value);
+                }
+            };
+        })();
+
         return {
-            draw: function (ctx, score, bestScore) {
+            score: 0,
+            bestScore: bestScore.retrieve(),
+
+            updateBestScore: function () {
+                if (this.score > this.bestScore) {
+                    this.bestScore = this.score;
+                    bestScore.store(this.bestScore);
+                }
+            },
+            draw: function (ctx) {
                 const paddingTop = config.relativePixel(60);
                 const paddingLeft = config.relativePixel(40);
                 const fontSize = config.fontSize(20);
@@ -80,7 +89,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
                 ctx.textAlign = "left";
                 ctx.clearRect(0, 0, config.width, paddingTop + config.relativePixel(5));
                 ctx.fillText(
-                    `Score: ${Math.floor(score)}    Best: ${Math.floor(bestScore)}`,
+                    `Score: ${Math.floor(this.score)}    Best: ${Math.floor(this.bestScore)}`,
                     paddingLeft, paddingTop
                 );
                 ctx.textAlign = "right";
@@ -115,20 +124,18 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
     const workspace = (function () {
         const exports = {x: 0, y: 0, canvas: null, context: null};
 
-        function centerContainer() {
+        function centerCanvas() {
             exports.x = (window.innerWidth - config.width) / 2;
             exports.y = (window.innerHeight - config.height) / 2;
-            exports.container.style.width = config.width + "px";
-            exports.container.style.height = config.height + "px";
-            exports.container.style.marginLeft = exports.x + "px";
-            exports.container.style.marginTop = exports.y + "px";
-            exports.container.style.borderRadius = config.relativePixel(
+            exports.canvas.style.width = config.width + "px";
+            exports.canvas.style.height = config.height + "px";
+            exports.canvas.style.marginLeft = exports.x + "px";
+            exports.canvas.style.marginTop = exports.y + "px";
+            exports.canvas.style.borderRadius = config.relativePixel(
                 config.wholeScreen ? 0 : 16) + "px";
         }
 
         function enableRetinaDisplay() {
-            exports.canvas.style.width = config.width + "px";
-            exports.canvas.style.height = config.height + "px";
             exports.canvas.width = config.width * devicePixelRatio;
             exports.canvas.height = config.height * devicePixelRatio;
             exports.context.scale(devicePixelRatio, devicePixelRatio);
@@ -137,18 +144,18 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         }
 
         exports.setup = function (container) {
-            this.container = container;
             this.canvas = document.createElement("canvas");
             this.canvas.width = config.width;
             this.canvas.height = config.height;
+            this.canvas.classList.add("game");
             this.context = this.canvas.getContext("2d");
-            this.container.appendChild(this.canvas);
+            container.appendChild(this.canvas);
 
-            centerContainer();
+            centerCanvas();
             enableRetinaDisplay();
 
             config.registerResizeEvent(function () {
-                centerContainer();
+                centerCanvas();
                 enableRetinaDisplay();
             });
         };
@@ -173,8 +180,6 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             this.page = pages.HOME;
             this.frames = 0;
             this.gameOverAt = 0;
-            this.score = 0;
-            this.bestScore = bestScore.retrieve();
 
             workspace.setup(container);
             workspace.canvas.addEventListener("click", this.onClickEvent.bind(this));
@@ -207,8 +212,8 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
         }
 
         start() {
-            config.throttleFPS(() => {
-                this.update();
+            config.throttleFPS(now => {
+                this.update(now);
                 this.render();
             }, 0);
 
@@ -226,15 +231,20 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             this.page = pages.GAME;
             this.frames = 0;
             this.gameOverAt = Infinity;
-            this.score = 0;
+            titleBar.score = 0;
             android.reset();
             platforms.reset();
-            ribbon.setBestScore(this.bestScore);
+            ribbon.setBestScore(titleBar.bestScore);
         }
 
         // Updates UI logic at every frame.
-        update() {
-            const deltaFrames = config.elapsedFrames();
+        update(now) {
+            let deltaFrames = config.elapsedFrames(now);
+            if (deltaFrames > 20) {
+                // This could happen when user leaves the game and comes back
+                // later.
+                deltaFrames = 1;
+            }
             this.frames += deltaFrames;
 
             switch (this.page) {
@@ -265,7 +275,7 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
 
             // Collision check might result to a game-over, therefore score
             // should be set before checking collision.
-            this.score = config.altitudeToScore(android.maxAltitude);
+            titleBar.score = config.altitudeToScore(android.maxAltitude);
 
             // Predict collision of the next frame.
             if (this.isPlaningGameOver()) {
@@ -317,15 +327,14 @@ define(["ui/android", "ui/spawns", "ui/ribbon", "ui/panel", "util/config",
             }
 
             // Title bar overlaps top area of the canvas, thus should draw at last.
-            titleBar.draw(workspace.context, this.score, this.bestScore);
+            titleBar.draw(workspace.context);
         }
 
         // showGameOver puts current frame to the GameOver frame (arg: gameOverAt),
         // or after delayed frames.
         showGameOver(delay = 0) {
             this.gameOverAt = this.frames + delay;
-            this.bestScore = Math.max(this.bestScore, this.score);
-            bestScore.store(this.bestScore);
+            titleBar.updateBestScore();
         }
 
         // Check if game is about to end. this is used to prevent a delayed GameOver

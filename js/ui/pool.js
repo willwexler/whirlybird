@@ -4,15 +4,15 @@ define(["ui/stair", "util/config"], function (stair, config) {
     // The pool maintains all sorts of platforms so that they won't be
     // instantiated and destroyed over and over.
     const platformPool = (function () {
-        this.pool = {};
+        const pool = {};
 
         for (const it of sprites.types) {
-            this.pool[it] = [];
+            pool[it] = [];
         }
 
         return {
-            retrieve: (type, altitude) => {
-                const cached = this.pool[type];
+            retrieve: function (type, altitude) {
+                const cached = pool[type];
                 // find recyclable
                 for (const it of cached) {
                     if (!it.active) {
@@ -23,11 +23,11 @@ define(["ui/stair", "util/config"], function (stair, config) {
                 // append the pool
                 const append = sprites[type].instantiate(altitude);
                 cached.push(append);
-                // console.log("pool appended", sprite.src, cached.length);
+                // console.log("pool appended", type, cached.length);
                 return append;
             },
-            disableAll: () => {
-                Object.values(this.pool).forEach(arr => {
+            disableAll: function () {
+                Object.values(pool).forEach(arr => {
                     arr.forEach(it => it.disable());
                 });
             },

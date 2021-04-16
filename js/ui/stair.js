@@ -323,7 +323,6 @@ define(["ui/sprite", "util/config", "util/camera"], function (Sprite, config, ca
                 from: {
                     x: android1.x,
                     y: android1.y + android1.h,
-                    // y: android1.y, // a broader check, not precise
                 },
                 to: {
                     x: android2.x,

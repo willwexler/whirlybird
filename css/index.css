@@ -5,12 +5,18 @@ body {
 }
 
 #container {
-    background: #faf7f3;
-    border-radius: 16px;
-    box-shadow: 0 0 10px #c3c3c3;
+    width: 100%;
+    height: 100%;
     position: fixed;
     overflow: hidden;
     touch-action: none;
+    user-select: none;
     -webkit-user-select: none;
     -webkit-user-drag: none;
+}
+
+.game {
+    background: #faf7f3;
+    border-radius: 16px;
+    box-shadow: 0 0 10px #c3c3c3;
 }

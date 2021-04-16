@@ -18,7 +18,7 @@ define(function () {
             // Duration frames of one slime joggle animation.
             slimeJoggleDuration: 12,
             // How many frames should camera shake when android is hurt.
-            quakeDuration: 22,
+            cameraShakeDuration: 22,
         },
         // Resizable exported values.
         resizable: {
@@ -49,8 +49,8 @@ define(function () {
             // fallingThreshold lower than every platform.
             fallingThreshold: 100,
             // How much should camera shake when android is hurt.
-            quakeDeltaX: 2,
-            quakeDeltaY: 4,
+            cameraShakeDeltaX: 2,
+            cameraShakeDeltaY: 4,
         },
         // Those fields in resizable should always be a integer.
         int: ["width", "height", "platformPadding", "platformGap", "fallingThreshold"],
@@ -84,8 +84,8 @@ define(function () {
         throttle: {
             then: 0,
             fps: 0,
-            callback: () => {
-            },
+            animId: 0,
+            callback: _ => _,
         },
     };
 
@@ -114,18 +114,17 @@ define(function () {
         fps.throttle.callback = callback;
         fps.throttle.fps = throttle;
 
-        function loop() {
-            requestAnimationFrame(loop);
+        function loop(now) {
+            fps.throttle.animId = requestAnimationFrame(loop);
 
             if (!fps.throttle.fps) {
-                fps.throttle.callback();
+                fps.throttle.callback(now);
                 return;
             }
 
-            const now = performance.now();
             if (!fps.throttle.then) {
                 fps.throttle.then = now;
-                fps.throttle.callback();
+                fps.throttle.callback(now);
                 return;
             }
 
@@ -133,16 +132,16 @@ define(function () {
             const elapsed = now - fps.throttle.then;
             if (elapsed > interval) {
                 fps.throttle.then = now - elapsed % interval;
-                fps.throttle.callback();
+                fps.throttle.callback(now);
             }
         }
 
-        requestAnimationFrame(loop);
+        fps.throttle.animId = requestAnimationFrame(loop);
+        return {stop: () => cancelAnimationFrame(fps.throttle.animId)};
     };
 
     // Return elapsed frames since last call.
-    exports.elapsedFrames = function () {
-        const now = performance.now();
+    exports.elapsedFrames = function (now) {
         if (!fps.update.then) {
             // function's first call, setup initial values.
             fps.update.then = now;

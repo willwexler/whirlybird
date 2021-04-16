@@ -2,20 +2,18 @@ define(["util/config"], function (config) {
     let width, height;
 
     const focal = {x: 0, y: 0};
-    const focalCopy = {x: 0, y: 0};
     const boxY = {high: 0, low: 0};
 
     function init() {
+        if (width && height) {
+            // Adjust focal position on resize.
+            focal.x = focal.x / width * config.width;
+            focal.y = focal.y / height * config.height;
+        }
         width = config.width;
         height = config.height;
         boxY.high = Math.floor(height * 0.5);
         boxY.low = Math.floor(height * 0.92);
-        reset();
-    }
-
-    function reset() {
-        focal.x = focalCopy.x = width / 2;
-        focal.y = focalCopy.y = height / 2;
     }
 
     // Try to follow a target. If it goes outside of a box range, move the
@@ -28,12 +26,10 @@ define(["util/config"], function (config) {
             // Move the camera up.
             const delta = boxY.high - relative.y;
             focal.y -= delta;
-            focalCopy.y -= delta;
         } else if (relative.y > boxY.low) {
             // Move the camera down.
             const delta = relative.y - boxY.low;
             focal.y += delta;
-            focalCopy.y += delta;
         }
     }
 
@@ -49,16 +45,18 @@ define(["util/config"], function (config) {
     config.registerResizeEvent(init);
 
     return {
-        reset: function () {
-            reset();
-        },
-
-        // The point parameters in follow(), focus() are all absolute positions.
+        // The point parameters in follow(), focus(), and moveTo() are all
+        // absolute positions.
         follow: function (point) {
             lookAt(point);
             return relativePosition(point);
         },
         focus: function (point) {
+            return relativePosition(point);
+        },
+        moveTo: function (point) {
+            focal.x = point.x;
+            focal.y = point.y;
             return relativePosition(point);
         },
 
@@ -68,15 +66,29 @@ define(["util/config"], function (config) {
                 relativePos.y >= 0 && relativePos.y < height;
         },
 
-        // Shake the camera at a certain range.
-        quake: function () {
-            focal.x = focalCopy.x + config.quakeDeltaX * (Math.random() - 0.5);
-            focal.y = focalCopy.y + config.quakeDeltaY * (Math.random() - 0.5);
+        prepareShake: function () {
+            focal.focal = {x: focal.x, y: focal.y};
+            focal.shakeFrames = 0;
+            focal.isShaking = true;
         },
-        // Restore camera's position after shaking.
-        stopQuake: function () {
-            focal.x = focalCopy.x;
-            focal.y = focalCopy.y;
+
+        // Shake the camera at a certain range.
+        shake: function (deltaFrames) {
+            if (!focal.isShaking) {
+                return;
+            }
+            if (focal.shakeFrames >= config.cameraShakeDuration) {
+                // Restore camera's position after shaking.
+                focal.x = focal.focal.x;
+                focal.y = focal.focal.y;
+                focal.isShaking = false;
+                return;
+            }
+            focal.shakeFrames += deltaFrames;
+            focal.x = focal.focal.x +
+                config.cameraShakeDeltaX * (Math.random() - 0.5);
+            focal.y = focal.focal.y +
+                config.cameraShakeDeltaY * (Math.random() - 0.5);
         },
     }
 });

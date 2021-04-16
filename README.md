@@ -14,12 +14,13 @@ Jump on the platforms, avoid the traps and see how much higher you can get.
    and over.
 3. Improve support for various resolutions. Adjust dynamically on window resize event.
 4. Add mobile support (touch control).
-5. Advanced collision check. Check movement intersection instead of actual collision. With this improved algorithm, the
-   game even supports machines with 10 FPS now, as long as you don't feel dizzy and throw up.
+5. Advanced collision check. Check for movement intersection instead of actual collision. With this improved algorithm,
+   the game even supports machines with 10 FPS now, as long as you don't feel dizzy and throw up.
+6. Pause the game when user leaves the browser page (switch to another tab on desktop, or press home on mobile).
 
 ## Debug Notes
 
 ### Framerate Calibration
 
-Enabled by default. Click FPS text 6 times in a row to toggle this feature. When disabled, the game will be frame-based,
-allowing you to play on a low FPS machine in slow motion.
+Enabled by default. Click FPS text 6 times in a row to toggle this feature. When disabled, the game speed will be
+frame-based rather than time-based, allowing you to play on a low FPS machine in slow motion.
