@@ -23,37 +23,35 @@ define(function () {
         // Resizable exported values.
         resizable: {
             // The preferred size of the canvas.
-            width: 600,
-            height: 1160,
+            width: {value: 600, int: true},
+            height: {value: 1160, int: true},
 
             // Physics variables involving the android.
-            gravity: 0.52,
-            moveVelocity: 10,
-            jumpVelocity: -22,
-            bounceVelocity: -39,
-            powerUpVelocity: -39,
-            maxFallingVelocity: 14,
+            gravity: {value: 0.52, int: false},
+            moveVelocity: {value: 10, int: false},
+            jumpVelocity: {value: -22, int: false},
+            bounceVelocity: {value: -39, int: false},
+            powerUpVelocity: {value: -39, int: false},
+            maxFallingVelocity: {value: 14, int: false},
 
             // Horizontal padding to the canvas of the spawned platforms.
-            platformPadding: 15,
+            platformPadding: {value: 15, int: true},
             // Vertical gap between every two platforms.
-            platformGap: 110,
+            platformGap: {value: 110, int: true},
             // Some platforms are constantly moving. This value specifies the speed
             // of them.
-            platformMoveSpeed: 1.5,
+            platformMoveSpeed: {value: 1.5, int: false},
             // Range of PowerUp prop's vertical joggle.
-            powerUpJoggleDistance: 4,
+            powerUpJoggleDistance: {value: 4, int: false},
             // Range of slime's joggle.
-            slimeJoggleDistance: 5,
+            slimeJoggleDistance: {value: 5, int: false},
             // Falling logic will be triggered if the android's position is
             // fallingThreshold lower than every platform.
-            fallingThreshold: 100,
+            fallingThreshold: {value: 100, int: true},
             // How much should camera shake when android is hurt.
-            cameraShakeDeltaX: 2,
-            cameraShakeDeltaY: 4,
+            cameraShakeDeltaX: {value: 2, int: false},
+            cameraShakeDeltaY: {value: 4, int: false},
         },
-        // Those fields in resizable should always be a integer.
-        int: ["width", "height", "platformPadding", "platformGap", "fallingThreshold"],
         // Aspect ratio for mobiles varies. These are minimum and maximum values
         // for the sake of playability.
         minAspectRatio: 1040 / 600,
@@ -98,9 +96,17 @@ define(function () {
         COLLIDE_TYPE_POWER: 3,
 
         fps: 0,
-        ...settings.static,
-        ...settings.resizable,
     };
+
+    // It seems like that r.js does not support spread syntax.
+    // According to the author of r.js, this looks to be an issue with Esprima.
+    // It is not keeping up with the new standards: jquery/esprima#1949.
+    for (const [key, value] of Object.entries(settings.static)) {
+        exports[key] = value;
+    }
+    for (const [key, value] of Object.entries(settings.resizable)) {
+        exports[key] = value.value;
+    }
 
     exports.fontSize = px => Math.ceil(px * settings.ratio);
     exports.relativePixel = px => px * settings.ratio;
@@ -190,10 +196,11 @@ define(function () {
             // Update all resizable values based on ratio.
             this.ratio = ratio;
             for (const [key, value] of Object.entries(this.resizable)) {
-                exports[key] = value * ratio;
-            }
-            for (const key of this.int) {
-                exports[key] = Math.round(exports[key]);
+                if (value.int) {
+                    exports[key] = Math.round(value.value * ratio);
+                } else {
+                    exports[key] = value.value * ratio;
+                }
             }
         };
 
@@ -204,7 +211,7 @@ define(function () {
             } else if (aspectRatio > settings.maxAspectRatio) {
                 aspectRatio = settings.maxAspectRatio;
             }
-            const referringWidth = settings.resizable.width;
+            const referringWidth = settings.resizable.width.value;
             const referringHeight = referringWidth * aspectRatio;
 
             settings.updateRatio(window.innerHeight / referringHeight);
@@ -216,14 +223,14 @@ define(function () {
                 exports.wholeScreen = true;
             }
             exports.height = window.innerHeight;
-            exports.moveVelocity = settings.resizable.moveVelocity *
+            exports.moveVelocity = settings.resizable.moveVelocity.value *
                 (exports.width / referringWidth);
         }
 
         function measure4Desktop() {
             const padding = window.innerHeight < 1100 ? 10 : 54;
-            const ratioVertical = (window.innerHeight - padding) / settings.resizable.height;
-            const ratioHorizontal = window.innerWidth / settings.resizable.width;
+            const ratioVertical = (window.innerHeight - padding) / settings.resizable.height.value;
+            const ratioHorizontal = window.innerWidth / settings.resizable.width.value;
 
             settings.updateRatio(Math.min(ratioVertical, ratioHorizontal));
         }

@@ -243,7 +243,8 @@ define(["ui/sprite", "util/input", "util/camera", "util/config",
                     deltaFrames,
             };
             return {
-                ...nextPosition,
+                x: nextPosition.x,
+                y: nextPosition.y,
                 altitude: -nextPosition.y,
                 velocity: nextVelocity,
                 w: this.w,

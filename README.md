@@ -5,7 +5,7 @@ A recreation of Google's *Whirlybird* game.
 Click on the button or press Space to start the game. Use left or right arrow keys (or A/D keys) to move horizontally.
 Jump on the platforms, avoid the traps and see how much higher you can get.
 
-**[PLAY ONLINE](http://121.4.186.151/whirlybird/).**
+**[PLAY ONLINE](http://121.4.186.151:8888/).**
 
 ## Change Log
 
